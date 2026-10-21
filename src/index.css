@@ -23,6 +23,7 @@
   --cico-expense-soft: #FCEAE7;
   --cico-error: #EF4444;
   --cico-error-text: #C63838;
+  --cico-error-on-dark: #FFD9D4; /* error text and borders on the deep green PIN screen */
   --cico-amber: #B7792B;
   --cico-violet: #8171BD;
   --cico-radius-sm: 10px;
@@ -55,6 +56,7 @@
   --color-expense-soft: var(--cico-expense-soft);
   --color-error: var(--cico-error);
   --color-error-text: var(--cico-error-text);
+  --color-error-on-dark: var(--cico-error-on-dark);
   --color-amber: var(--cico-amber);
   --color-violet: var(--cico-violet);
 

@@ -4,21 +4,24 @@ import { AddTransactionPage } from './features/add-transaction/AddTransactionPag
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { TransactionsPage } from './features/transactions/TransactionsPage'
 import { useHashRoute } from './hooks/useHashRoute'
+import { LockGate } from './lock/LockGate'
 
 function App() {
   const route = useHashRoute()
   return (
-    <ToastProvider>
-      <AppShell route={route}>
-        {route === 'add' ? (
-          <AddTransactionPage />
-        ) : route === 'transactions' ? (
-          <TransactionsPage />
-        ) : (
-          <DashboardPage />
-        )}
-      </AppShell>
-    </ToastProvider>
+    <LockGate>
+      <ToastProvider>
+        <AppShell route={route}>
+          {route === 'add' ? (
+            <AddTransactionPage />
+          ) : route === 'transactions' ? (
+            <TransactionsPage />
+          ) : (
+            <DashboardPage />
+          )}
+        </AppShell>
+      </ToastProvider>
+    </LockGate>
   )
 }
 
