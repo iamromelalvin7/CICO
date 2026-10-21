@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/* CICO design tokens. Source of truth: .agents/CICO-design-skill.md */
+:root {
+  color-scheme: light;
+  --cico-bg: #F7F8F5;
+  --cico-surface: #FFFFFF;
+  --cico-surface-muted: #EEF2EE;
+  --cico-ink: #172B27;
+  --cico-ink-muted: #60716C;
+  --cico-border: #DFE7E1;
+  --cico-primary: #176B5B;
+  --cico-primary-hover: #105448;
+  --cico-primary-soft: #DDF2E9;
+  --cico-deep: #0F4C3A;
+  --cico-accent: #10B981;
+  --cico-accent-text: #0B7C56;
+  --cico-mint: #A8E3CF;
+  --cico-positive: #237B58;
+  --cico-positive-soft: #E3F4EA;
+  --cico-expense: #C75C52;
+  --cico-expense-text: #AF5148;
+  --cico-expense-soft: #FCEAE7;
+  --cico-error: #EF4444;
+  --cico-error-text: #C63838;
+  --cico-amber: #B7792B;
+  --cico-violet: #8171BD;
+  --cico-radius-sm: 10px;
+  --cico-radius-md: 16px;
+  --cico-radius-lg: 22px;
+  --cico-shadow-card: 0 2px 12px rgb(23 43 39 / 4%);
+}
+
+/* Expose tokens as Tailwind utilities, e.g. bg-bg, text-ink, border-border, rounded-md */
+@theme inline {
+  --font-sans: 'Inter Variable', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --color-bg: var(--cico-bg);
+  --color-surface: var(--cico-surface);
+  --color-surface-muted: var(--cico-surface-muted);
+  --color-ink: var(--cico-ink);
+  --color-ink-muted: var(--cico-ink-muted);
+  --color-border: var(--cico-border);
+  --color-primary: var(--cico-primary);
+  --color-primary-hover: var(--cico-primary-hover);
+  --color-primary-soft: var(--cico-primary-soft);
+  --color-deep: var(--cico-deep);
+  --color-accent: var(--cico-accent);
+  --color-accent-text: var(--cico-accent-text);
+  --color-mint: var(--cico-mint);
+  --color-positive: var(--cico-positive);
+  --color-positive-soft: var(--cico-positive-soft);
+  --color-expense: var(--cico-expense);
+  --color-expense-text: var(--cico-expense-text);
+  --color-expense-soft: var(--cico-expense-soft);
+  --color-error: var(--cico-error);
+  --color-error-text: var(--cico-error-text);
+  --color-amber: var(--cico-amber);
+  --color-violet: var(--cico-violet);
+
+  --radius-sm: var(--cico-radius-sm);
+  --radius-md: var(--cico-radius-md);
+  --radius-lg: var(--cico-radius-lg);
+
+  --shadow-card: var(--cico-shadow-card);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-bg font-sans text-ink;
+    min-height: 100dvh;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--cico-primary);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
