@@ -23,4 +23,4 @@ npm run dev
 
 ## Project docs
 
-Product spec, build rules and design system live in [`.agents/`](.agents/).
+Product spec, build rules and design system are kept locally and not committed.

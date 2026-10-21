@@ -32,3 +32,6 @@ credentials.*
 
 # PWA dev output
 dev-dist
+
+# Local agent docs: never commit
+.agents/
