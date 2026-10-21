@@ -12,6 +12,10 @@ cp .env.example .env   # then fill in values
 npm run dev
 ```
 
+### Setting up sync
+
+Data is always saved to IndexedDB first and synced to Supabase in the background. To create the tables, open your Supabase project's SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql) (safe to re-run). Then set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env`. Without them the app still works, on this device only.
+
 ### Running the AI functions locally
 
 Gemini is called only from the serverless functions in `api/` (`/api/parse` and `/api/chat`), so the API key never reaches the browser. `npm run dev` serves the app but not these functions. To run both together, use the Vercel CLI:

@@ -5,6 +5,13 @@ import type { Category, Transaction } from './types'
 export const db = new Dexie('cico') as Dexie & {
   categories: EntityTable<Category, 'id'>
   transactions: EntityTable<Transaction, 'id'>
+  meta: EntityTable<Meta, 'key'>
+}
+
+// Local-only bookkeeping, e.g. the sync cursor. Never synced.
+export interface Meta {
+  key: string
+  value: unknown
 }
 
 // Only indexed fields are listed. `synced` is a boolean, which IndexedDB cannot index,
@@ -12,6 +19,11 @@ export const db = new Dexie('cico') as Dexie & {
 db.version(1).stores({
   categories: 'id, name, updated_at',
   transactions: 'id, category_id, occurred_at, updated_at',
+})
+db.version(2).stores({
+  categories: 'id, name, updated_at',
+  transactions: 'id, category_id, occurred_at, updated_at',
+  meta: 'key',
 })
 
 // Seed categories use fixed IDs so every device creates the same rows and sync
@@ -28,9 +40,13 @@ const SEED_CATEGORIES: Array<Pick<Category, 'id' | 'name' | 'color_or_icon'>> = 
   { id: 'b3be51f6-d163-48c7-b965-6f023a049983', name: 'Miscellaneous', color_or_icon: '#60716C' },
 ]
 
+// Seeds carry a fixed, old timestamp so that, under last-write-wins, any real edit made on
+// another device (a rename, a new colour) beats a fresh install's untouched copy.
+const SEED_TIMESTAMP = '2026-01-01T00:00:00.000Z'
+
 // Runs once, when the database is first created on this device.
 db.on('populate', (tx) => {
-  const now = new Date().toISOString()
+  const now = SEED_TIMESTAMP
   return tx.table<Category>('categories').bulkAdd(
     SEED_CATEGORIES.map((c) => ({
       ...c,
