@@ -31,7 +31,7 @@ export function SyncStatus({ className = '' }: { className?: string }) {
             : 'Sync needs attention'
 
   return (
-    <div className={`flex items-center gap-2 text-xs text-ink-muted ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-2 text-xs text-ink-muted ${className}`}>
       <p role="status" className="flex min-w-0 items-center gap-2">
         <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[phase]}`} />
         <span className="truncate">{label}</span>
