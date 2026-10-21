@@ -5,7 +5,8 @@ import { InlineNotice } from '../../components/InlineNotice'
 import { PageHeader } from '../../components/PageHeader'
 import { TransactionRow } from '../../components/TransactionRow'
 import type { Category, Transaction } from '../../db'
-import { routeHref } from '../../hooks/useHashRoute'
+import { routeHref, useHashParam } from '../../hooks/useHashRoute'
+import { CategoryIcon } from '../../components/CategoryIcon'
 import { formatDateTime, formatSignedMoney } from '../../lib/format'
 import { EditTransactionDialog } from './EditTransactionDialog'
 import { applyFilters, EMPTY_FILTERS, type Filters } from './filters'
@@ -16,6 +17,8 @@ const PAGE_SIZE = 50
 
 export function TransactionsPage() {
   const { data, retry } = useTransactionsData()
+  // Set by the search box in the top bar; a new search starts from fresh filters.
+  const search = useHashParam('q')
 
   return (
     <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -36,14 +39,14 @@ export function TransactionsPage() {
       ) : data.transactions.length === 0 ? (
         <EmptyList />
       ) : (
-        <TransactionsContent data={data} />
+        <TransactionsContent key={search} data={data} initialSearch={search} />
       )}
     </div>
   )
 }
 
-function TransactionsContent({ data }: { data: TransactionsData }) {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+function TransactionsContent({ data, initialSearch }: { data: TransactionsData; initialSearch: string }) {
+  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY_FILTERS, search: initialSearch }))
   const [limit, setLimit] = useState(PAGE_SIZE)
   // Edits always go to the stored row; the id is resolved against live data.
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,11 +159,14 @@ function TransactionTable({ rows, categories, onEdit }: TransactionTableProps) {
           <th scope="col" className={th}>
             Description
           </th>
-          <th scope="col" className={`${th} w-44`}>
+          <th scope="col" className={`${th} w-48`}>
             Category
           </th>
           <th scope="col" className={`${th} w-40 text-right`}>
             Amount
+          </th>
+          <th scope="col" className={`${th} hidden w-28 lg:table-cell`}>
+            Type
           </th>
           <th scope="col" className={`${th} w-16`}>
             <span className="sr-only">Actions</span>
@@ -185,12 +191,8 @@ function TransactionTable({ rows, categories, onEdit }: TransactionTableProps) {
                 {t.description || <span className="font-normal text-ink-muted">No description</span>}
               </td>
               <td className="px-3 py-3">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    aria-hidden
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: category?.color_or_icon ?? '#60716C' }}
-                  />
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <CategoryIcon id={t.category_id} name={categoryName} color={category?.color_or_icon ?? '#60716C'} size="sm" />
                   <span className="truncate text-ink">{categoryName}</span>
                 </span>
               </td>
@@ -201,6 +203,15 @@ function TransactionTable({ rows, categories, onEdit }: TransactionTableProps) {
               >
                 <span className="sr-only">{income ? 'Income' : 'Expense'}: </span>
                 {formatSignedMoney(t.amount, t.direction)}
+              </td>
+              <td className="hidden px-3 py-3 lg:table-cell">
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    income ? 'bg-positive-soft text-positive' : 'bg-expense-soft text-expense-text'
+                  }`}
+                >
+                  {income ? 'Income' : 'Expense'}
+                </span>
               </td>
               <td className="py-1.5 pr-4 pl-1 text-right">
                 <button

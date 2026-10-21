@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   db,
   getBalance,
+  getBalanceThrough,
+  getDailyBalances,
   getTotalsByCategory,
   getTotalsForPeriod,
   INVESTMENTS_CATEGORY_ID,
@@ -10,7 +12,12 @@ import {
   SAVINGS_CATEGORY_ID,
   type CategoryTotal,
 } from '../../db'
-import { monthRange, previousComparableRange, toLocalDate } from '../../lib/dates'
+import { addMonths, monthRange, previousComparableRange, toLocalDate } from '../../lib/dates'
+
+const CASH_FLOW_MONTHS = 6
+
+const isSavingsOrInvestment = (c: CategoryTotal) =>
+  c.category_id === SAVINGS_CATEGORY_ID || c.category_id === INVESTMENTS_CATEGORY_ID
 
 // Everything the dashboard shows, from the shared query layer. Re-runs whenever
 // local data changes. `undefined` while loading.
@@ -19,38 +26,66 @@ export function useDashboardData(month: Date) {
   return useLiveQuery(async () => {
     const range = monthRange(month)
     const previousRange = previousComparableRange(month)
-    const [balance, period, previous, byCategory, recent, categories] = await Promise.all([
-      getBalance(),
-      getTotalsForPeriod(range.start, range.end),
-      getTotalsForPeriod(previousRange.start, previousRange.end),
-      getTotalsByCategory(range.start, range.end),
-      listRecentTransactions(5),
-      // Includes deleted categories so older rows still show their name.
-      db.categories.toArray(),
-    ])
-    const isSavingsOrInvestment = (c: CategoryTotal) =>
-      c.category_id === SAVINGS_CATEGORY_ID || c.category_id === INVESTMENTS_CATEGORY_ID
+    const cashFlowMonths = Array.from({ length: CASH_FLOW_MONTHS }, (_, i) =>
+      addMonths(month, i - (CASH_FLOW_MONTHS - 1)),
+    )
+
+    const [balance, period, previous, byCategory, previousByCategory, recent, categories, daily, previousBalance, cashFlow] =
+      await Promise.all([
+        getBalance(),
+        getTotalsForPeriod(range.start, range.end),
+        getTotalsForPeriod(previousRange.start, previousRange.end),
+        getTotalsByCategory(range.start, range.end),
+        getTotalsByCategory(previousRange.start, previousRange.end),
+        listRecentTransactions(6),
+        // Includes deleted categories so older rows still show their name.
+        db.categories.toArray(),
+        getDailyBalances(range.start, range.end),
+        getBalanceThrough(previousRange.end),
+        Promise.all(
+          cashFlowMonths.map(async (m) => {
+            const r = monthRange(m)
+            return { month: m, totals: await getTotalsForPeriod(r.start, r.end) }
+          }),
+        ),
+      ])
 
     const spending = byCategory.filter((c) => c.direction === 'expense' && !isSavingsOrInvestment(c))
-    const movedOut = byCategory
-      .filter((c) => c.direction === 'expense' && isSavingsOrInvestment(c))
-      .reduce((sum, c) => sum + Math.round(c.total * 100), 0) / 100
+    const movedTo = (id: string) =>
+      byCategory
+        .filter((c) => c.direction === 'expense' && c.category_id === id)
+        .reduce((sum, c) => sum + Math.round(c.total * 100), 0) / 100
 
     return {
       range,
       previousRange,
       balance,
+      // Balance at the end of the selected period, and at the end of the comparable one.
+      balanceAtEnd: daily.length > 0 ? daily[daily.length - 1].balance : balance.balance,
+      previousBalance,
+      // True when there was any recorded activity before the comparison point.
+      hasPreviousBalance: (await db.transactions.where('occurred_at').below(endOfDayIso(previousRange.end)).filter((t) => t.deleted_at === null).count()) > 0,
+      daily,
       period,
       previous,
       savings: netMovedInto(byCategory, SAVINGS_CATEGORY_ID),
       investments: netMovedInto(byCategory, INVESTMENTS_CATEGORY_ID),
-      // Portion of this period's expenses that went into savings/investments.
-      movedToSavingsAndInvestments: movedOut,
+      previousSavings: netMovedInto(previousByCategory, SAVINGS_CATEGORY_ID),
+      previousInvestments: netMovedInto(previousByCategory, INVESTMENTS_CATEGORY_ID),
+      // Gross amounts moved this period, which are part of expenses.
+      movedToSavings: movedTo(SAVINGS_CATEGORY_ID),
+      movedToInvestments: movedTo(INVESTMENTS_CATEGORY_ID),
       spending,
+      cashFlow,
       recent,
       categories: new Map(categories.map((c) => [c.id, c])),
     }
   }, [key])
+}
+
+function endOfDayIso(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(y, m - 1, d + 1).toISOString()
 }
 
 export type DashboardData = NonNullable<ReturnType<typeof useDashboardData>>

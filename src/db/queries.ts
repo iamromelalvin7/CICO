@@ -142,6 +142,51 @@ export function netMovedInto(totals: CategoryTotal[], categoryId: string): numbe
   return fromCents(cents)
 }
 
+// All-time balance at the end of a local day (inclusive).
+export async function getBalanceThrough(end_date: string): Promise<number> {
+  const to = localDayStart(end_date)
+  to.setDate(to.getDate() + 1)
+  const rows = (await db.transactions.where('occurred_at').below(to.toISOString()).toArray()).filter(
+    (t) => t.deleted_at === null,
+  )
+  return sumByDirection(rows).net
+}
+
+export interface DailyBalance {
+  date: string
+  balance: number
+}
+
+// The all-time balance at the end of each day in the range, for the balance trend.
+export async function getDailyBalances(start_date: string, end_date: string): Promise<DailyBalance[]> {
+  const from = localDayStart(start_date)
+  const before = (await db.transactions.where('occurred_at').below(from.toISOString()).toArray()).filter(
+    (t) => t.deleted_at === null,
+  )
+  let cents = toCents(sumByDirection(before).net)
+
+  const byDay = new Map<string, number>()
+  for (const t of await transactionsBetween(start_date, end_date)) {
+    const key = localDateKey(new Date(t.occurred_at))
+    const delta = t.direction === 'income' ? toCents(t.amount) : -toCents(t.amount)
+    byDay.set(key, (byDay.get(key) ?? 0) + delta)
+  }
+
+  const out: DailyBalance[] = []
+  const end = localDayStart(end_date)
+  for (const d = new Date(from); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = localDateKey(d)
+    cents += byDay.get(key) ?? 0
+    out.push({ date: key, balance: fromCents(cents) })
+  }
+  return out
+}
+
+function localDateKey(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export async function listRecentTransactions(limit = 5): Promise<Transaction[]> {
   const rows: Transaction[] = []
   await db.transactions

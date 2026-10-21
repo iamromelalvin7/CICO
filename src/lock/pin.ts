@@ -47,6 +47,10 @@ export async function startSession(): Promise<void> {
   await db.meta.put({ key: SESSION_KEY, value: new Date(Date.now() + SESSION_MS).toISOString() })
 }
 
+export async function endSession(): Promise<void> {
+  await db.meta.delete(SESSION_KEY)
+}
+
 export async function sessionValid(): Promise<boolean> {
   const until = (await db.meta.get(SESSION_KEY))?.value
   return typeof until === 'string' && Date.parse(until) > Date.now()

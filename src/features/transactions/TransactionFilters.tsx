@@ -41,7 +41,7 @@ export function TransactionFilters({
 
   return (
     <section aria-label="Filter transactions" className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(15rem,1.2fr)]">
         <div className="col-span-2 sm:col-span-3 lg:col-span-1">
           <Field id={ids.search} label="Search">
             <div className="relative">
@@ -62,7 +62,7 @@ export function TransactionFilters({
           </Field>
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
+        <div>
           <SelectField
             id={ids.date}
             label="Date"
@@ -91,16 +91,32 @@ export function TransactionFilters({
           ))}
         </SelectField>
 
-        <SelectField
-          id={ids.direction}
-          label="Direction"
-          value={filters.direction}
-          onChange={(v) => set('direction', v as Direction | '')}
-        >
-          <option value="">All</option>
-          <option value="income">Income</option>
-          <option value="expense">Expenses</option>
-        </SelectField>
+        <fieldset className="col-span-2 flex flex-col sm:col-span-1">
+          <legend className="mb-1.5 text-sm font-medium text-ink">Direction</legend>
+          <div className="grid grid-cols-3 gap-1 rounded-sm bg-surface-muted p-1">
+            {DIRECTIONS.map((d) => {
+              const checked = filters.direction === d.value
+              return (
+                <label
+                  key={d.value || 'all'}
+                  className={`flex min-h-9 cursor-pointer items-center justify-center rounded-[8px] px-2 text-sm font-medium transition-colors duration-150 has-focus-visible:outline-2 has-focus-visible:outline-primary ${
+                    checked ? 'bg-surface text-ink shadow-card' : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={ids.direction}
+                    value={d.value}
+                    checked={checked}
+                    onChange={() => set('direction', d.value)}
+                    className="sr-only"
+                  />
+                  {d.label}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
       </div>
 
       {filters.datePreset === 'custom' && (
@@ -161,6 +177,12 @@ export function TransactionFilters({
     </section>
   )
 }
+
+const DIRECTIONS: Array<{ value: Direction | ''; label: string }> = [
+  { value: '', label: 'All' },
+  { value: 'income', label: 'Income' },
+  { value: 'expense', label: 'Expenses' },
+]
 
 interface SelectFieldProps {
   id: string

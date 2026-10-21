@@ -1,6 +1,7 @@
-import { CircleAlert, LoaderCircle, WifiOff } from 'lucide-react'
+import { Check, CircleAlert, Delete, LoaderCircle, WifiOff } from 'lucide-react'
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { onLock } from './lock-events'
 import { clearPin, hasPin, PIN_PATTERN, sessionValid, setPin, startSession, verifyPin } from './pin'
 import {
   CODE_PATTERN,
@@ -32,6 +33,8 @@ export function LockGate({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => onLock(() => setScreen('locked')), [])
 
   // Lock again once the session runs out, even if the app stays open.
   useEffect(() => {
@@ -97,8 +100,7 @@ function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => voi
   const [busy, setBusy] = useState(false)
   const confirming = first !== null
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
+  async function submit() {
     setError(null)
     if (!PIN_PATTERN.test(value)) {
       setError('Use 4 to 6 digits.')
@@ -128,21 +130,26 @@ function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => voi
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-      {notice && !confirming && <p className="text-sm text-mint">{notice}</p>}
-      <PinField
-        key={confirming ? 'confirm' : 'choose'}
-        label={confirming ? 'Enter the same PIN again' : 'Choose a 4 to 6 digit PIN'}
+    <div className="flex flex-col items-center gap-4">
+      <PinPad
+        title={confirming ? 'Enter the same PIN again' : 'Choose a PIN'}
+        helper={
+          notice && !confirming
+            ? notice
+            : confirming
+              ? 'Type it once more to confirm.'
+              : "4 to 6 digits. It keeps casual eyes off this device; it isn't a password. You'll be asked for it every three days."
+        }
         value={value}
-        onChange={setValue}
+        onChange={(v) => {
+          setValue(v)
+          setError(null)
+        }}
+        onSubmit={submit}
         error={error}
-        autoComplete="new-password"
+        busy={busy}
+        submitLabel={confirming ? 'Set PIN' : 'Continue'}
       />
-      <LockButton loading={busy}>{confirming ? 'Set PIN' : 'Continue'}</LockButton>
-      <p className="text-xs leading-relaxed text-white/65">
-        The PIN keeps casual eyes off this device. It isn't a password and isn't stored anywhere
-        else. You'll be asked for it every three days.
-      </p>
       {confirming && (
         <TextButton
           onClick={() => {
@@ -154,7 +161,7 @@ function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => voi
           Start over
         </TextButton>
       )}
-    </form>
+    </div>
   )
 }
 
@@ -165,8 +172,7 @@ function Unlock({ onUnlocked, onForgot }: { onUnlocked: () => void; onForgot: ()
   const [failures, setFailures] = useState(0)
   const waitLeft = useCountdown()
 
-  async function submit(e: FormEvent) {
-    e.preventDefault()
+  async function submit() {
     if (waitLeft.seconds > 0) return
     setError(null)
     if (!PIN_PATTERN.test(value)) {
@@ -200,20 +206,20 @@ function Unlock({ onUnlocked, onForgot }: { onUnlocked: () => void; onForgot: ()
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-      <PinField
-        label="Enter your PIN"
+    <div className="flex flex-col items-center gap-3">
+      <PinPad
+        title="Enter your PIN"
+        helper="Enter your 4 to 6 digit PIN to continue."
         value={value}
         onChange={setValue}
+        onSubmit={submit}
         error={error}
-        autoComplete="current-password"
-        autoFocus
+        busy={busy}
+        submitLabel="Unlock"
+        waitSeconds={waitLeft.seconds}
       />
-      <LockButton loading={busy} disabled={waitLeft.seconds > 0}>
-        {waitLeft.seconds > 0 ? `Try again in ${waitLeft.seconds}s` : 'Unlock'}
-      </LockButton>
       <TextButton onClick={onForgot}>Forgot PIN?</TextButton>
-    </form>
+    </div>
   )
 }
 
@@ -333,36 +339,107 @@ function ForgotPin({ onBack, onReset }: { onBack: () => void; onReset: () => voi
 const pinInputClass =
   'block min-h-14 w-full rounded-sm border border-white/25 bg-white/10 px-4 text-center text-2xl font-semibold tracking-[0.4em] text-white tabular-nums placeholder:text-white/30 focus:border-mint focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint aria-invalid:border-error-on-dark'
 
-interface PinFieldProps {
-  label: string
+interface PinPadProps {
+  title: string
+  helper: string
   value: string
   onChange: (value: string) => void
+  onSubmit: () => void
   error: string | null
-  autoComplete: string
-  autoFocus?: boolean
+  busy: boolean
+  submitLabel: string
+  // Seconds left in a wait after too many wrong tries.
+  waitSeconds?: number
 }
 
-function PinField({ label, value, onChange, error, autoComplete, autoFocus = true }: PinFieldProps) {
-  const id = useId()
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
+
+const keyClass =
+  'flex size-[68px] cursor-pointer items-center justify-center rounded-full bg-white/[0.07] text-2xl font-medium text-white tabular-nums transition-colors duration-150 hover:bg-white/[0.14] active:bg-white/20 focus-visible:outline-mint disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/[0.07]'
+
+// Dots plus an on-screen keypad. A hardware keyboard works too: digits, Backspace, Enter.
+function PinPad({ title, helper, value, onChange, onSubmit, error, busy, submitLabel, waitSeconds = 0 }: PinPadProps) {
+  const errorId = useId()
+  const waiting = waitSeconds > 0
+  const canType = !busy && !waiting && value.length < 6
+  const canSubmit = value.length >= 4 && !busy && !waiting
+
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return
+      if (/^\d$/.test(e.key)) {
+        e.preventDefault()
+        if (canType) onChange(value + e.key)
+      } else if (e.key === 'Backspace') {
+        e.preventDefault()
+        onChange(value.slice(0, -1))
+      } else if (e.key === 'Enter' && canSubmit) {
+        e.preventDefault()
+        onSubmit()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [value, canType, canSubmit, onChange, onSubmit])
+
   return (
-    <div className="flex flex-col gap-1.5 text-left">
-      <label htmlFor={id} className="text-sm font-medium text-white">
-        {label}
-      </label>
-      <input
-        id={id}
-        autoFocus={autoFocus}
-        type="password"
-        inputMode="numeric"
-        autoComplete={autoComplete}
-        maxLength={6}
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
-        className={pinInputClass}
-      />
-      {error && <LockError id={`${id}-error`}>{error}</LockError>}
+    <div className="flex w-full flex-col items-center">
+      <h1 className="text-xl font-semibold">{title}</h1>
+      <p className="mt-2 max-w-72 text-sm leading-relaxed text-white/70">{helper}</p>
+
+      <div aria-hidden className="mt-7 flex items-center gap-3.5">
+        {Array.from({ length: 6 }, (_, i) => {
+          const filled = i < value.length
+          const optional = i >= 4
+          return (
+            <span
+              key={i}
+              className={`size-3.5 rounded-full border-2 transition-colors duration-150 ${
+                filled ? 'border-mint bg-mint' : optional ? 'border-dashed border-white/30' : 'border-white/60'
+              }`}
+            />
+          )
+        })}
+      </div>
+      <p className="sr-only" aria-live="polite">
+        {value.length} {value.length === 1 ? 'digit' : 'digits'} entered
+      </p>
+      <div className="mt-4 flex min-h-10 justify-center">{error && <LockError id={errorId}>{error}</LockError>}</div>
+
+      <div className="mt-2 grid grid-cols-3 gap-x-6 gap-y-4">
+        {KEYS.map((k) => (
+          <button key={k} type="button" disabled={!canType} onClick={() => onChange(value + k)} className={keyClass}>
+            {k}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={!canSubmit}
+          aria-label={submitLabel}
+          title={submitLabel}
+          className={`flex size-[68px] cursor-pointer items-center justify-center rounded-full transition-colors duration-150 focus-visible:outline-mint disabled:cursor-not-allowed ${
+            canSubmit ? 'bg-mint text-deep hover:bg-white' : 'bg-white/[0.04] text-white/30'
+          }`}
+        >
+          {busy ? <LoaderCircle aria-hidden className="size-6 animate-spin" /> : <Check aria-hidden className="size-7" />}
+        </button>
+        <button type="button" disabled={!canType} onClick={() => onChange(value + '0')} className={keyClass}>
+          0
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(value.slice(0, -1))}
+          disabled={value.length === 0 || busy}
+          aria-label="Delete last digit"
+          className="flex size-[68px] cursor-pointer items-center justify-center rounded-full text-white/80 transition-colors duration-150 hover:bg-white/[0.07] focus-visible:outline-mint disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+        >
+          <Delete aria-hidden className="size-6" />
+        </button>
+      </div>
+      <p className="mt-5 min-h-5 text-sm text-white/70" aria-live="polite">
+        {waiting ? `Try again in ${waitSeconds}s` : ''}
+      </p>
     </div>
   )
 }

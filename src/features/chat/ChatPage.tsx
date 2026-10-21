@@ -92,7 +92,7 @@ export function ChatPage() {
                     type="button"
                     onClick={() => send(s)}
                     disabled={!online}
-                    className="flex min-h-11 w-full items-center rounded-sm border border-border bg-surface px-4 text-left text-sm text-ink transition-colors duration-150 hover:border-primary/40 hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface"
+                    className="flex min-h-11 w-full cursor-pointer items-center rounded-sm border border-border bg-surface px-4 py-2.5 text-left text-sm text-ink transition-colors duration-150 hover:border-primary/40 hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface"
                   >
                     {s}
                   </button>
