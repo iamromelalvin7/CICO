@@ -1,12 +1,13 @@
-import { House, Plus } from 'lucide-react'
+import { House, Plus, ReceiptText } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { routeHref, type Route } from '../hooks/useHashRoute'
 import { SyncStatus } from './SyncStatus'
 
-// Only screens that exist are listed; Transactions, Ask CICO and Settings join as they are built.
+// Only screens that exist are listed; Ask CICO and Settings join as they are built.
 const NAV: Array<{ route: Route; label: string; mobileLabel: string; icon: typeof House }> = [
   { route: 'overview', label: 'Overview', mobileLabel: 'Home', icon: House },
   { route: 'add', label: 'Add transaction', mobileLabel: 'Add', icon: Plus },
+  { route: 'transactions', label: 'Transactions', mobileLabel: 'Activity', icon: ReceiptText },
 ]
 
 export function AppShell({ route, children }: { route: Route; children: ReactNode }) {

@@ -2,6 +2,7 @@ import { AppShell } from './components/AppShell'
 import { ToastProvider } from './components/Toast'
 import { AddTransactionPage } from './features/add-transaction/AddTransactionPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
+import { TransactionsPage } from './features/transactions/TransactionsPage'
 import { useHashRoute } from './hooks/useHashRoute'
 
 function App() {
@@ -9,7 +10,13 @@ function App() {
   return (
     <ToastProvider>
       <AppShell route={route}>
-        {route === 'add' ? <AddTransactionPage /> : <DashboardPage />}
+        {route === 'add' ? (
+          <AddTransactionPage />
+        ) : route === 'transactions' ? (
+          <TransactionsPage />
+        ) : (
+          <DashboardPage />
+        )}
       </AppShell>
     </ToastProvider>
   )

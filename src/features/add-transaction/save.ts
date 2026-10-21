@@ -3,6 +3,7 @@ import {
   addTransaction,
   db,
   listCategories,
+  updateTransaction,
   ValidationError,
   type Direction,
   type Transaction,
@@ -24,19 +25,35 @@ export interface TransactionDraft {
 // Saves locally in one atomic step: creates the proposed category if needed, then the transaction.
 export async function saveTransaction(draft: TransactionDraft): Promise<Transaction> {
   return db.transaction('rw', db.categories, db.transactions, async () => {
-    const categoryId =
-      draft.category.kind === 'existing'
-        ? draft.category.id
-        : await resolveNewCategory(draft.category.name)
-
     return addTransaction({
       amount: draft.amount,
       direction: draft.direction,
-      category_id: categoryId,
+      category_id: await resolveCategory(draft.category),
       description: draft.description,
       occurred_at: draft.occurredAt,
     })
   })
+}
+
+// Same as saveTransaction, for an existing transaction. Leave `occurredAt` out to keep the
+// stored time exactly (the form only edits to the minute).
+export async function updateSavedTransaction(
+  id: string,
+  draft: Omit<TransactionDraft, 'occurredAt'> & { occurredAt?: Date },
+): Promise<Transaction> {
+  return db.transaction('rw', db.categories, db.transactions, async () => {
+    return updateTransaction(id, {
+      amount: draft.amount,
+      direction: draft.direction,
+      category_id: await resolveCategory(draft.category),
+      description: draft.description,
+      occurred_at: draft.occurredAt,
+    })
+  })
+}
+
+async function resolveCategory(choice: CategoryChoice): Promise<string> {
+  return choice.kind === 'existing' ? choice.id : resolveNewCategory(choice.name)
 }
 
 // If a category with this name already exists (any case), reuse it instead of failing.

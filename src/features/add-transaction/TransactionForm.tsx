@@ -1,16 +1,16 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '../../components/Button'
 import { Field, inputClass } from '../../components/Field'
 import { fieldProps } from '../../components/field-props'
 import { InlineNotice } from '../../components/InlineNotice'
 import { useToast } from '../../components/toast-context'
-import { ValidationError, type Category } from '../../db'
+import { NotFoundError, ValidationError, type Category } from '../../db'
 import { LIMITS } from '../../../shared/ai-contract'
 import { formatMoney, parseAmountInput } from '../../lib/format'
 import { CategoryPicker } from './CategoryPicker'
 import { DirectionToggle } from './DirectionToggle'
 import type { FormValues } from './form-values'
-import { saveTransaction } from './save'
+import { saveTransaction, updateSavedTransaction } from './save'
 
 type FieldName = 'amount' | 'category' | 'description' | 'occurredAt'
 type Errors = Partial<Record<FieldName, string>>
@@ -33,9 +33,13 @@ interface TransactionFormProps {
   cancelLabel?: string
   // Focus the amount on mount, for entering several transactions in a row.
   autoFocus?: boolean
+  // When set, saving updates this transaction instead of adding a new one.
+  transactionId?: string
+  // Extra control at the start of the action row, e.g. a delete button.
+  extraAction?: ReactNode
 }
 
-// Shared by manual entry and by the review step after parsing. Nothing is saved until submit.
+// Shared by manual entry, the review step after parsing, and editing. Nothing is saved until submit.
 export function TransactionForm({
   initial,
   categories,
@@ -44,6 +48,8 @@ export function TransactionForm({
   onCancel,
   cancelLabel = 'Cancel',
   autoFocus = false,
+  transactionId,
+  extraAction,
 }: TransactionFormProps) {
   const uid = useId()
   const [values, setValues] = useState<FormValues>(initial)
@@ -83,25 +89,33 @@ export function TransactionForm({
 
     setSaving(true)
     try {
-      const saved = await saveTransaction({
+      const draft = {
         amount: parseAmountInput(values.amount),
         direction: values.direction,
         category: values.category,
         description: values.description,
         occurredAt: new Date(values.occurredAt),
-      })
+      }
+      const saved = transactionId
+        ? await updateSavedTransaction(transactionId, {
+            ...draft,
+            occurredAt: values.occurredAt === initial.occurredAt ? undefined : draft.occurredAt,
+          })
+        : await saveTransaction(draft)
       const categoryName =
         values.category.kind === 'new'
           ? values.category.name
           : categories?.find((c) => c.id === saved.category_id)?.name
       toast(
-        'Saved on this device',
+        transactionId ? 'Changes saved on this device' : 'Saved on this device',
         [formatMoney(saved.amount), categoryName, saved.description].filter(Boolean).join(' · '),
       )
       onSaved()
     } catch (err) {
       if (err instanceof ValidationError && DB_FIELD[err.field]) {
         setErrors({ [DB_FIELD[err.field]]: err.message })
+      } else if (err instanceof NotFoundError) {
+        setSaveError(err.message)
       } else {
         console.error(err)
         setSaveError("Couldn't save on this device. Your entry is still here; try again.")
@@ -206,13 +220,14 @@ export function TransactionForm({
       {saveError && <InlineNotice tone="error">{saveError}</InlineNotice>}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {extraAction && <div className="flex flex-col sm:mr-auto">{extraAction}</div>}
         {onCancel && (
           <Button variant="secondary" onClick={onCancel} disabled={saving}>
             {cancelLabel}
           </Button>
         )}
         <Button type="submit" loading={saving} className="sm:min-w-44">
-          Save transaction
+          {transactionId ? 'Save changes' : 'Save transaction'}
         </Button>
       </div>
     </form>

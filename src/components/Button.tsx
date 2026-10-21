@@ -1,12 +1,15 @@
 import { LoaderCircle } from 'lucide-react'
 import type { ButtonHTMLAttributes } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost'
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-primary text-white hover:bg-primary-hover',
   secondary: 'border border-border bg-surface text-ink hover:bg-surface-muted',
   ghost: 'text-ink-muted hover:bg-surface-muted hover:text-ink',
+  // Destructive actions only.
+  danger: 'bg-error-text text-white hover:bg-error-text/90',
+  'danger-ghost': 'text-error-text hover:bg-error/5',
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

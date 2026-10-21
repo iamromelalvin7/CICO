@@ -210,9 +210,17 @@ function RecentTransactions({ data }: { data: DashboardData }) {
       aria-labelledby="recent-heading"
       className="rounded-lg border border-border bg-surface p-5 shadow-card sm:p-6"
     >
-      <h2 id="recent-heading" className="text-base font-semibold text-ink">
-        Recent transactions
-      </h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="recent-heading" className="text-base font-semibold text-ink">
+          Recent transactions
+        </h2>
+        <a
+          href={routeHref('transactions')}
+          className="-my-2 inline-flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-primary hover:underline"
+        >
+          View all
+        </a>
+      </div>
       <ul className="mt-2 divide-y divide-border">
         {data.recent.map((t) => (
           <li key={t.id}>

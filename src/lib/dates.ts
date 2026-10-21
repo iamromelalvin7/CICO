@@ -28,6 +28,14 @@ export interface DateRange {
   end: string
 }
 
+// The whole calendar month, including days still to come.
+export function fullMonthRange(month: Date): DateRange {
+  return {
+    start: toLocalDate(month),
+    end: toLocalDate(new Date(month.getFullYear(), month.getMonth(), daysInMonth(month))),
+  }
+}
+
 // The whole month, or up to today if it is the current month.
 export function monthRange(month: Date, today = new Date()): DateRange {
   const lastDay = isSameMonth(month, today) ? today.getDate() : daysInMonth(month)
@@ -62,4 +70,12 @@ export function formatRange(range: DateRange): string {
 
 export function monthName(month: Date, withYear: boolean): string {
   return month.toLocaleDateString('en-GH', withYear ? { month: 'long', year: 'numeric' } : { month: 'long' })
+}
+
+const DAY_MONTH_YEAR = new Intl.DateTimeFormat('en-GH', { day: 'numeric', month: 'short', year: 'numeric' })
+
+// "YYYY-MM-DD" (local) as "21 Oct 2026".
+export function formatLocalDate(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return DAY_MONTH_YEAR.format(new Date(y, m - 1, d))
 }
