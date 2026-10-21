@@ -35,3 +35,6 @@ dev-dist
 
 # Local agent docs: never commit
 .agents/
+
+# Vercel CLI link data
+.vercel
