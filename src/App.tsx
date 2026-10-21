@@ -1,13 +1,16 @@
+import { AppShell } from './components/AppShell'
 import { ToastProvider } from './components/Toast'
 import { AddTransactionPage } from './features/add-transaction/AddTransactionPage'
+import { DashboardPage } from './features/dashboard/DashboardPage'
+import { useHashRoute } from './hooks/useHashRoute'
 
-// Only Add transaction exists so far; navigation arrives with the next screens.
 function App() {
+  const route = useHashRoute()
   return (
     <ToastProvider>
-      <main className="min-h-dvh">
-        <AddTransactionPage />
-      </main>
+      <AppShell route={route}>
+        {route === 'add' ? <AddTransactionPage /> : <DashboardPage />}
+      </AppShell>
     </ToastProvider>
   )
 }

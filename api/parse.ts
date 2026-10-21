@@ -23,7 +23,7 @@ const limiter = new RateLimiter(30, 60_000)
 
 const SYSTEM_INSTRUCTION = `You extract a single personal finance transaction from a short note written by the user.
 Amounts are in Ghana cedis (GH₵). Return the number exactly as stated; never convert currencies or invent an amount.
-direction is "income" if money came in to the user, "expense" if money went out.
+direction is "income" if money came in to the user, "expense" if money went out. Moving money into savings or investments is an "expense" in the Savings or Investments category; taking money back out of them is "income" in that same category.
 category: pick the best match from the provided category list, using its exact spelling. Only if nothing reasonably fits, propose a short new category name (1-3 words, Title Case).
 description: a short, clean label for the transaction (for example "Hoodie", "Salary", "Lunch"), without the amount.
 occurred_at: if the note mentions when it happened, resolve it against the provided current local date/time and return "YYYY-MM-DDTHH:mm". If it does not mention a time, return null.
