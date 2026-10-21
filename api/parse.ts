@@ -6,7 +6,8 @@ import {
   type ParseResponse,
   type ParsedTransaction,
 } from '../shared/ai-contract.js'
-import { gemini, geminiModel } from './_lib/gemini.js'
+import { ThinkingLevel } from '@google/genai'
+import { generate, parseModel } from './_lib/gemini.js'
 import {
   HttpError,
   RateLimiter,
@@ -47,8 +48,8 @@ export const POST = postHandler(limiter, async (body): Promise<ParseResponse> =>
   const categories = requireCategories(body.categories)
   const clock = requireClock(body.clock)
 
-  const response = await gemini().models.generateContent({
-    model: geminiModel(),
+  const response = await generate({
+    model: parseModel(),
     contents: [
       {
         role: 'user',
@@ -67,7 +68,8 @@ export const POST = postHandler(limiter, async (body): Promise<ParseResponse> =>
       systemInstruction: SYSTEM_INSTRUCTION,
       responseMimeType: 'application/json',
       responseJsonSchema: RESPONSE_SCHEMA,
-      temperature: 0,
+      // Extraction is simple; extra thinking only adds seconds.
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
     },
   })
 
@@ -99,8 +101,8 @@ function validate(raw: string | undefined, categories: string[]): ParsedTransact
   if (!proposed) throw notUnderstood
   const existing = categories.find((c) => c.toLowerCase() === proposed.toLowerCase())
 
-  const description =
-    typeof out.description === 'string' ? out.description.trim().slice(0, LIMITS.descriptionChars) : ''
+  const trimmed = typeof out.description === 'string' ? out.description.trim() : ''
+  const description = (trimmed.charAt(0).toUpperCase() + trimmed.slice(1)).slice(0, LIMITS.descriptionChars)
 
   const occurredAt =
     typeof out.occurred_at === 'string' && isLocalDateTime(out.occurred_at) ? out.occurred_at : null

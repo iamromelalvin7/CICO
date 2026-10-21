@@ -13,7 +13,7 @@ import {
   type ChatTurn,
   type ClientClock,
 } from '../shared/ai-contract.js'
-import { gemini, geminiModel } from './_lib/gemini.js'
+import { chatModel, generate } from './_lib/gemini.js'
 import {
   HttpError,
   RateLimiter,
@@ -112,8 +112,8 @@ export const POST = postHandler(limiter, async (body): Promise<ChatResponse> => 
   // Stop runaway loops: after too many function rounds, force a text answer.
   const allowTools = toolRoundsSinceLastQuestion(turns) < LIMITS.chatToolRounds
 
-  const response = await gemini().models.generateContent({
-    model: geminiModel(),
+  const response = await generate({
+    model: chatModel(),
     contents: turns.map(toContent),
     config: {
       systemInstruction: systemInstruction(clock, categories),
@@ -123,7 +123,6 @@ export const POST = postHandler(limiter, async (body): Promise<ChatResponse> => 
           mode: allowTools ? FunctionCallingConfigMode.AUTO : FunctionCallingConfigMode.NONE,
         },
       },
-      temperature: 0.2,
     },
   })
 
