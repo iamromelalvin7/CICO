@@ -85,6 +85,12 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       required: ['start_date', 'end_date'],
     },
   },
+  {
+    name: 'get_balance',
+    description:
+      'All-time balance (total income minus total expenses) with all-time totals and transaction count.',
+    parametersJsonSchema: { type: 'object', properties: {} },
+  },
 ]
 
 function systemInstruction(clock: ClientClock, categories: string[]): string {
@@ -97,6 +103,8 @@ Rules:
 - Call a function whenever the question needs data. Resolve relative periods ("this month", "last week") into explicit dates first.
 - If the results contain no matching transactions, say so plainly.
 - Amounts are in Ghana cedis; write them as "GH₵ 1,250.00".
+- Balance = income minus expenses. Money moved into savings or investments is recorded as an expense in the Savings or Investments category, so it lowers the balance. When the user asks about spending, say whether the figure includes money moved to savings or investments.
+- If a function result contains an "error", fix the arguments and call it again, or explain that you could not get the data.
 - Be concise. State the period you used, e.g. "October 1–20".
 - You describe the user's data; you do not give financial advice. Do not judge or shame spending.
 - If a question is not about the user's transactions, say you can only answer questions about their recorded money.

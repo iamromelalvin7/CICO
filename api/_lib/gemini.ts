@@ -46,10 +46,26 @@ export async function generate(params: GenerateContentParameters): Promise<Gener
         continue
       }
       console.error(`Gemini request failed (model ${params.model}):`, err)
-      if (status === 503 || status === 429) {
+      if (status === 429) throw quotaError(err)
+      if (status === 503) {
         throw new HttpError(503, 'Gemini is busy right now. Try again in a moment.')
       }
       throw new HttpError(502, 'The AI service returned an error. Try again later.')
     }
   }
+}
+
+// Gemini's 429 says which quota ran out (per minute or per day) and when to retry.
+function quotaError(err: unknown): HttpError {
+  const detail = err instanceof Error ? err.message : ''
+  const retrySeconds = Number(/"retryDelay":\s*"(\d+)s"/.exec(detail)?.[1] ?? NaN)
+  const headers: Record<string, string> = Number.isFinite(retrySeconds)
+    ? { 'retry-after': String(retrySeconds) }
+    : {}
+  if (detail.includes('PerDay')) {
+    const hours = Number.isFinite(retrySeconds) ? Math.max(1, Math.round(retrySeconds / 3600)) : null
+    const when = hours ? ` It resets in about ${hours} hour${hours === 1 ? '' : 's'}.` : ' It resets daily.'
+    return new HttpError(429, `Today's Gemini allowance for this app is used up.${when}`, headers)
+  }
+  return new HttpError(429, "You've reached Gemini's per-minute limit. Wait about a minute, then try again.", headers)
 }

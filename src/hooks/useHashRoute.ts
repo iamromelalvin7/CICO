@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from 'react'
 
-export type Route = 'overview' | 'add' | 'transactions'
+export type Route = 'overview' | 'add' | 'transactions' | 'ask'
 
 const PATHS: Record<string, Route> = {
   '': 'overview',
   '/': 'overview',
   '/add': 'add',
   '/transactions': 'transactions',
+  '/ask': 'ask',
 }
 
 function current(): Route {

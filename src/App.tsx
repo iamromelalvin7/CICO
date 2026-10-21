@@ -1,6 +1,7 @@
 import { AppShell } from './components/AppShell'
 import { ToastProvider } from './components/Toast'
 import { AddTransactionPage } from './features/add-transaction/AddTransactionPage'
+import { ChatPage } from './features/chat/ChatPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { TransactionsPage } from './features/transactions/TransactionsPage'
 import { useHashRoute } from './hooks/useHashRoute'
@@ -16,6 +17,8 @@ function App() {
             <AddTransactionPage />
           ) : route === 'transactions' ? (
             <TransactionsPage />
+          ) : route === 'ask' ? (
+            <ChatPage />
           ) : (
             <DashboardPage />
           )}

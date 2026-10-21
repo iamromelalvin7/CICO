@@ -54,6 +54,7 @@ export const CHAT_FUNCTIONS = [
   'get_totals_by_category',
   'compare_periods',
   'list_largest_transactions',
+  'get_balance',
 ] as const
 
 export type ChatFunctionName = (typeof CHAT_FUNCTIONS)[number]
