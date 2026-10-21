@@ -1,10 +1,14 @@
-// Placeholder shell until the screens in the build plan are implemented.
+import { ToastProvider } from './components/Toast'
+import { AddTransactionPage } from './features/add-transaction/AddTransactionPage'
+
+// Only Add transaction exists so far; navigation arrives with the next screens.
 function App() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-2 px-4 text-center">
-      <h1 className="text-3xl font-semibold tracking-tight">CICO</h1>
-      <p className="text-ink-muted">Cash In, Cash Out</p>
-    </main>
+    <ToastProvider>
+      <main className="min-h-dvh">
+        <AddTransactionPage />
+      </main>
+    </ToastProvider>
   )
 }
 

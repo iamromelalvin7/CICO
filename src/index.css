@@ -19,7 +19,7 @@
   --cico-positive: #237B58;
   --cico-positive-soft: #E3F4EA;
   --cico-expense: #C75C52;
-  --cico-expense-text: #AF5148;
+  --cico-expense-text: #AA4F46;
   --cico-expense-soft: #FCEAE7;
   --cico-error: #EF4444;
   --cico-error-text: #C63838;
@@ -90,5 +90,12 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
