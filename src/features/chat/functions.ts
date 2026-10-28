@@ -1,4 +1,4 @@
-// Runs the query functions Gemini asks for against local data, through the same query layer
+// Runs the query functions the model asks for against local data, through the same query layer
 // as the dashboard. Arguments come from the model, so they are validated like user input;
 // bad arguments come back as an { error } result the model can correct.
 

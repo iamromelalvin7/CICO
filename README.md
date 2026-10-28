@@ -4,6 +4,13 @@ A personal finance tracker that answers "where did all my money go?". Log income
 
 Offline-first PWA built with React, Vite, Tailwind CSS, IndexedDB, Supabase, Groq and Gemini.
 
+## How money is counted
+
+- **Income** and **Expenses** are what you earn and spend.
+- Moving money into **Savings** or **Investments** is logged as Cash out in that category; taking it back out is Cash in in the same category. These are transfers between your own pots, so Income and Expenses leave them out.
+- **Available balance** is your spendable money: everything in minus everything out, transfers included. Money sitting in savings or investments is not part of it.
+- The **Net saved** and **Net invested** cards show what moved in during the month, plus an all-time total counted from when you started tracking.
+
 ## Getting started
 
 ```bash
@@ -15,6 +22,8 @@ npm run dev
 ### Setting up sync
 
 Data is always saved to IndexedDB first and synced to Supabase in the background. To create the tables, open your Supabase project's SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql) (safe to re-run). Then set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env`. Without them the app still works, on this device only.
+
+The PIN is shared the same way: its salted hash is kept in the `settings` table, so one PIN unlocks every device and the installed app. The three-day unlock lasts per device.
 
 For deployments, set the same `VITE_` variables (plus `VITE_RECOVERY_EMAIL`) in the Vercel dashboard under Project Settings → Environment Variables, then redeploy. They are baked in at build time, so a build made without them never syncs, and the PIN stays per device.
 

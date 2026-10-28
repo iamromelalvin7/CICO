@@ -77,7 +77,7 @@ async function post<T>(
   return data as T
 }
 
-// Asks Gemini (via /api/parse) for a suggestion. Never saves anything.
+// Asks the AI (via /api/parse) for a suggestion. Never saves anything.
 export async function parseEntry(
   text: string,
   categories: string[],
@@ -88,7 +88,7 @@ export async function parseEntry(
   return result.transaction
 }
 
-// One step of a chat: Gemini either asks for query functions to be run or answers.
+// One step of a chat: the model either asks for query functions to be run or answers.
 export async function chatStep(
   turns: ChatTurn[],
   categories: string[],

@@ -33,8 +33,8 @@ credentials.*
 # PWA dev output
 dev-dist
 
-# Local agent docs: never commit
-.agents/
+# Agent docs are committed (Oct 28, 2026); the design mockup image stays local
+.agents/*.png
 
 # Vercel CLI link data
 .vercel

@@ -62,7 +62,8 @@ export type ChatFunctionName = (typeof CHAT_FUNCTIONS)[number]
 export interface ChatFunctionCall {
   name: ChatFunctionName
   args: Record<string, unknown>
-  // Opaque Gemini value that must be sent back unchanged with the next request.
+  // Opaque Gemini value that must be sent back unchanged with the next request. Calls made
+  // by Groq have none.
   thoughtSignature?: string
 }
 
