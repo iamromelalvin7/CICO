@@ -59,8 +59,10 @@ export function DonutChart({
               strokeWidth={activeKey === a.key ? thickness + 4 : thickness}
               strokeDasharray={`${a.dash} ${c - a.dash}`}
               strokeDashoffset={-a.offset}
-              onPointerEnter={() => onActiveChange?.(a.key)}
-              onPointerLeave={() => onActiveChange?.(null)}
+              // Hover follows the mouse; on touch, a tap selects a segment and a second tap clears it.
+              onPointerEnter={(e) => e.pointerType === 'mouse' && onActiveChange?.(a.key)}
+              onPointerLeave={(e) => e.pointerType === 'mouse' && onActiveChange?.(null)}
+              onClick={() => onActiveChange?.(activeKey === a.key ? null : a.key)}
               className="cursor-pointer transition-[opacity,stroke-width] duration-200"
               style={{ opacity: activeKey && activeKey !== a.key ? 0.35 : 1 }}
             />

@@ -15,7 +15,9 @@ interface TrendAreaProps {
 
 const W = 320
 
-// Small area chart with a hover readout. The line is drawn from real points only.
+// Small area chart with a readout on hover, tap or horizontal drag. The line is drawn from
+// real points only. Dashed lines mark the highest and lowest values, and the first and last
+// dates are labelled, so the scale is readable without an axis.
 export function TrendArea({ points, formatValue, height = 96, summary }: TrendAreaProps) {
   const gradientId = useId()
   const [hover, setHover] = useState<number | null>(null)
@@ -40,43 +42,62 @@ export function TrendArea({ points, formatValue, height = 96, summary }: TrendAr
   const active = hover === null ? null : points[hover]
 
   return (
-    <div
-      role="img"
-      aria-label={summary}
-      className="relative w-full touch-none"
-      style={{ height }}
-      onPointerMove={handleMove}
-      onPointerLeave={() => setHover(null)}
-    >
-      <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="size-full overflow-visible" aria-hidden>
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="var(--cico-accent)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--cico-accent)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill={`url(#${gradientId})`} />
-        <path d={line} fill="none" stroke="var(--cico-accent)" strokeWidth="2.25" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-        {hover !== null && (
-          <line x1={x(hover)} x2={x(hover)} y1={0} y2={height} stroke="var(--cico-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+    <div className="w-full">
+      <div
+        role="img"
+        aria-label={summary}
+        // Vertical swipes still scroll the page; taps and sideways drags move the readout.
+        className="relative w-full touch-pan-y"
+        style={{ height }}
+        onPointerDown={handleMove}
+        onPointerMove={handleMove}
+        onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(null)}
+      >
+        <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" className="size-full overflow-visible" aria-hidden>
+          <defs>
+            <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--cico-accent)" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="var(--cico-accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill={`url(#${gradientId})`} />
+          {max !== min &&
+            [max, min].map((v) => (
+              <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)} stroke="var(--cico-border)" strokeWidth="1" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+            ))}
+          <path d={line} fill="none" stroke="var(--cico-accent)" strokeWidth="2.25" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+          {hover !== null && (
+            <line x1={x(hover)} x2={x(hover)} y1={0} y2={height} stroke="var(--cico-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          )}
+        </svg>
+        {active && hover !== null && (
+          <>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-accent shadow"
+              style={{ left: `${(x(hover) / W) * 100}%`, top: y(active.value) }}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -top-9 -translate-x-1/2 rounded-sm bg-ink px-2 py-1 text-xs whitespace-nowrap text-white tabular-nums"
+              style={{ left: `clamp(76px, ${(x(hover) / W) * 100}%, calc(100% - 76px))` }}
+            >
+              {active.label} · {formatValue(active.value)}
+            </span>
+          </>
         )}
-      </svg>
-      {active && hover !== null && (
-        <>
-          <span
-            aria-hidden
-            className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-accent shadow"
-            style={{ left: `${(x(hover) / W) * 100}%`, top: y(active.value) }}
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -top-9 -translate-x-1/2 rounded-sm bg-ink px-2 py-1 text-xs whitespace-nowrap text-white tabular-nums"
-            style={{ left: `clamp(48px, ${(x(hover) / W) * 100}%, calc(100% - 48px))` }}
-          >
-            {active.label} · {formatValue(active.value)}
-          </span>
-        </>
-      )}
+      </div>
+      <div aria-hidden className="mt-2 text-xs text-ink-muted tabular-nums">
+        <p className="flex justify-between gap-3">
+          <span>{points[0].label}</span>
+          <span>{points[points.length - 1].label}</span>
+        </p>
+        {max !== min && (
+          <p className="mt-1">
+            Low {formatValue(min)} · High {formatValue(max)}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

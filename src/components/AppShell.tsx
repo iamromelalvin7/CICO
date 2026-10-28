@@ -107,16 +107,20 @@ function NavList({
   items,
   route,
   collapsed = false,
+  mobileLabels = false,
   onNavigate,
 }: {
   items: NavItem[]
   route: Route
   collapsed?: boolean
+  // The phone drawer uses the bottom bar's names, so each screen has one name per device.
+  mobileLabels?: boolean
   onNavigate?: () => void
 }) {
   return (
     <ul className="flex flex-col gap-1">
-      {items.map(({ route: r, label, icon: Icon }) => {
+      {items.map(({ route: r, label: fullLabel, mobileLabel, icon: Icon }) => {
+        const label = mobileLabels ? mobileLabel : fullLabel
         const active = r === route
         return (
           <li key={r}>
@@ -207,27 +211,42 @@ function MobileTopBar({ onMenu }: { onMenu: () => void }) {
   )
 }
 
+// A modal dialog: it covers the bottom bar and the page, traps focus, closes on Escape or a
+// tap outside, and returns focus to the menu button when it closes.
 function MobileDrawer({ route, open, onClose }: { route: Route; open: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
-    else if (!open && dialog.open) dialog.close()
+    if (open && !dialog.open) {
+      dialog.showModal()
+      // Focus the drawer itself rather than its first button, so no focus ring flashes on
+      // the close button when the menu is opened by touch.
+      dialog.focus()
+    } else if (!open && dialog.open) dialog.close()
+    if (!open) return
+    // The page behind stays put while the drawer is open.
+    const root = document.documentElement
+    const previous = root.style.overflow
+    root.style.overflow = 'hidden'
+    return () => {
+      root.style.overflow = previous
+    }
   }, [open])
 
   return (
     <dialog
       ref={ref}
       aria-label="Menu"
+      tabIndex={-1}
       onClose={onClose}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
-      className="m-0 h-dvh max-h-none w-72 max-w-[85vw] bg-surface p-0 text-ink shadow-lg backdrop:bg-ink/40 open:motion-safe:animate-[drawer-in_200ms_ease-out] lg:hidden"
+      className="m-0 h-dvh max-h-none w-[min(320px,85vw)] max-w-none bg-surface p-0 text-ink shadow-lg outline-none backdrop:bg-black/35 open:motion-safe:animate-[drawer-in_200ms_ease-out] lg:hidden"
     >
-      <div className="flex h-full flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="flex h-full flex-col overflow-y-auto overscroll-contain px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between pl-3">
           <Wordmark />
           <button
@@ -240,9 +259,9 @@ function MobileDrawer({ route, open, onClose }: { route: Route; open: boolean; o
           </button>
         </div>
         <nav aria-label="Menu" className="mt-6">
-          <NavList items={[...MAIN_NAV, SETTINGS]} route={route} onNavigate={onClose} />
+          <NavList items={[...MAIN_NAV, SETTINGS]} route={route} mobileLabels onNavigate={onClose} />
         </nav>
-        <SyncStatus className="mt-auto px-3" />
+        <SyncStatus className="mt-auto px-3 pt-6" />
       </div>
     </dialog>
   )
@@ -263,18 +282,21 @@ function MobileBottomNav({ route }: { route: Route }) {
               <a
                 href={routeHref(r)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors duration-150 ${
+                className={`flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors duration-150 ${
                   active ? 'text-primary' : 'text-ink-muted'
                 }`}
               >
-                <span
-                  className={
-                    isAdd
-                      ? `flex size-10 items-center justify-center rounded-full ${active ? 'bg-primary-hover' : 'bg-primary'} text-white shadow-card`
-                      : `flex h-8 w-12 items-center justify-center rounded-full ${active ? 'bg-primary-soft' : ''}`
-                  }
-                >
-                  <Icon aria-hidden className="size-5" />
+                {/* Every icon sits in the same 40px box so the labels line up. */}
+                <span className="flex h-10 items-center justify-center">
+                  <span
+                    className={
+                      isAdd
+                        ? `flex size-10 items-center justify-center rounded-full ${active ? 'bg-primary-hover' : 'bg-primary'} text-white shadow-card`
+                        : `flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-150 ${active ? 'bg-primary-soft' : ''}`
+                    }
+                  >
+                    <Icon aria-hidden className="size-5" />
+                  </span>
                 </span>
                 {mobileLabel}
               </a>

@@ -51,25 +51,22 @@ export function DashboardPage() {
             Here's your financial overview for {isCurrent ? 'this month' : label}.
           </p>
         </div>
-        <div className="flex items-center gap-1 rounded-sm border border-border bg-surface p-1 shadow-card">
+        <div className="flex max-w-full items-center gap-1 rounded-sm border border-border bg-surface p-1 shadow-card">
           <button
             type="button"
             onClick={() => setMonth(addMonths(month, -1))}
             aria-label="Previous month"
-            className="flex size-9 cursor-pointer items-center justify-center rounded-[8px] text-ink-muted transition-colors duration-150 hover:bg-surface-muted hover:text-ink"
+            className="flex size-11 cursor-pointer items-center justify-center rounded-[8px] text-ink-muted transition-colors duration-150 hover:bg-surface-muted hover:text-ink"
           >
             <ChevronLeft aria-hidden className="size-4" />
           </button>
-          <span className="flex min-w-32 items-center justify-center gap-2 text-sm font-medium text-ink" aria-live="polite">
-            <CalendarDays aria-hidden className="size-4 text-ink-muted" />
-            {isCurrent ? 'This month' : label}
-          </span>
+          <MonthPicker month={month} max={thisMonth} label={isCurrent ? 'This month' : label} onChange={setMonth} />
           <button
             type="button"
             onClick={() => setMonth(addMonths(month, 1))}
             disabled={isCurrent}
             aria-label="Next month"
-            className="flex size-9 cursor-pointer items-center justify-center rounded-[8px] text-ink-muted transition-colors duration-150 hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            className="flex size-11 cursor-pointer items-center justify-center rounded-[8px] text-ink-muted transition-colors duration-150 hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <ChevronRight aria-hidden className="size-4" />
           </button>
@@ -84,6 +81,60 @@ export function DashboardPage() {
         <DashboardContent data={data} isCurrent={isCurrent} monthLabel={label} />
       )}
     </div>
+  )
+}
+
+// Whether this browser has a native month picker (desktop Firefox shows a plain text box).
+const MONTH_INPUT_SUPPORTED = (() => {
+  const input = document.createElement('input')
+  input.setAttribute('type', 'month')
+  return input.type === 'month'
+})()
+
+const monthValue = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+// The selected month's name. Tapping it opens the device's month picker, where supported;
+// the arrows on either side step one month at a time.
+function MonthPicker({ month, max, label, onChange }: { month: Date; max: Date; label: string; onChange: (month: Date) => void }) {
+  const content = (
+    <>
+      <CalendarDays aria-hidden className="size-4 text-ink-muted" />
+      {label}
+    </>
+  )
+  if (!MONTH_INPUT_SUPPORTED) {
+    return (
+      <span className="flex min-w-0 items-center justify-center gap-2 px-2 text-sm font-medium whitespace-nowrap text-ink sm:min-w-32" aria-live="polite">
+        {content}
+      </span>
+    )
+  }
+  return (
+    <label className="relative flex min-h-11 min-w-0 cursor-pointer whitespace-nowrap sm:min-w-32 items-center justify-center gap-2 rounded-[8px] px-2 text-sm font-medium text-ink transition-colors duration-150 hover:bg-surface-muted has-focus-visible:outline-2 has-focus-visible:outline-primary">
+      <span aria-live="polite" className="flex items-center gap-2">
+        {content}
+      </span>
+      <input
+        type="month"
+        aria-label="Choose a month"
+        value={monthValue(month)}
+        max={monthValue(max)}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker()
+          } catch {
+            // Some browsers only open the picker from their own control; tapping still works.
+          }
+        }}
+        onChange={(e) => {
+          const [y, m] = e.target.value.split('-').map(Number)
+          if (!y || !m) return
+          const picked = new Date(y, m - 1, 1)
+          onChange(picked > max ? max : picked)
+        }}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      />
+    </label>
   )
 }
 
@@ -110,30 +161,30 @@ function DashboardContent({ data, isCurrent, monthLabel }: { data: DashboardData
             change={<Change current={period.expense} previous={previous.expense} against={previousRange.end} />}
           />
           <MetricCard
-            label="Savings"
+            label="Net saved"
             icon={PiggyBank}
             tint="var(--cico-amber)"
             value={period.net_moved_to_savings}
             change={<Change current={period.net_moved_to_savings} previous={previous.net_moved_to_savings} against={previousRange.end} />}
-            note={`Net moved in · ${formatMoney(balance.in_savings)} in total`}
+            note={`${formatMoney(balance.in_savings)} in total`}
           />
           <MetricCard
-            label="Investments"
+            label="Net invested"
             icon={ChartLine}
             tint="var(--cico-violet)"
             value={period.net_moved_to_investments}
             change={<Change current={period.net_moved_to_investments} previous={previous.net_moved_to_investments} against={previousRange.end} />}
-            note={`Net moved in · ${formatMoney(balance.in_investments)} in total`}
+            note={`${formatMoney(balance.in_investments)} in total`}
           />
         </ul>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
         <SpendingByCategory data={data} />
         <RecentTransactions data={data} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
         <CashFlow data={data} />
         <WhereMoneyWent data={data} />
       </div>
@@ -172,12 +223,13 @@ function BalanceCard({ data, isCurrent, monthLabel }: { data: DashboardData; isC
   return (
     <section
       aria-labelledby="balance-label"
-      className="grid gap-4 overflow-hidden rounded-lg border border-border bg-surface p-5 shadow-card sm:p-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] md:items-center md:gap-8 lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"
+      className="grid min-w-0 gap-4 overflow-hidden rounded-lg border border-border bg-surface p-5 shadow-card sm:p-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] md:items-center md:gap-8 lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"
     >
       <div>
         <h2 id="balance-label" className="text-sm font-medium text-ink-muted">
-          {isCurrent ? 'Total balance' : `Balance at the end of ${monthLabel}`}
+          {isCurrent ? 'Available balance' : `Available balance at the end of ${monthLabel}`}
         </h2>
+        <p className="mt-0.5 text-sm text-ink-muted">Excludes money in savings and investments</p>
         <p className="mt-2 text-[32px] leading-tight font-semibold tracking-tight whitespace-nowrap text-ink tabular-nums min-[400px]:text-[34px] sm:text-[40px]">
           {formatMoney(shown)}
         </p>
@@ -194,6 +246,7 @@ function BalanceCard({ data, isCurrent, monthLabel }: { data: DashboardData; isC
             </span>
           )}
           <span className="text-ink-muted">
+            {/* Closing minus opening balance for the period: every transaction in it, transfers included. */}
             Change for {formatRange(range)}:{' '}
             <span className="font-medium text-ink tabular-nums">
               {period.balance_change > 0 ? '+' : ''}
@@ -201,7 +254,6 @@ function BalanceCard({ data, isCurrent, monthLabel }: { data: DashboardData; isC
             </span>
           </span>
         </div>
-        <p className="mt-2 text-xs text-ink-muted">Money you can spend: all-time income minus expenses, less what's in savings and investments.</p>
       </div>
       {points.length >= 2 && first && last && (
         <TrendArea
@@ -231,7 +283,7 @@ function MetricCard({
   note?: string
 }) {
   return (
-    <li className="flex flex-col rounded-md border border-border bg-surface p-4 shadow-card">
+    <li className="flex min-w-0 flex-col rounded-md border border-border bg-surface p-4 shadow-card">
       <p className="flex items-center gap-2 text-sm font-medium text-ink-muted">
         <span
           aria-hidden
@@ -244,7 +296,7 @@ function MetricCard({
       </p>
       <p className="mt-3 text-base font-semibold whitespace-nowrap text-ink tabular-nums min-[400px]:text-lg sm:text-xl">{formatMoney(value)}</p>
       {change}
-      {note && <p className="mt-1 text-xs leading-snug text-ink-muted">{note}</p>}
+      {note && <p className="mt-auto pt-1 text-[13px] leading-snug text-ink-muted">{note}</p>}
     </li>
   )
 }
@@ -257,7 +309,7 @@ function Change({ current, previous, against }: { current: number; previous: num
   const Icon = pct > 0 ? ArrowUp : ArrowDown
   const detail = `Compared with last month up to ${SHORT_DAY.format(parseDay(against))}`
   return (
-    <p className="mt-1 flex items-center gap-1 text-xs text-ink-muted" title={detail}>
+    <p className="mt-1 flex items-center gap-1 text-[13px] leading-snug text-ink-muted" title={detail}>
       {pct !== 0 && <Icon aria-hidden className="size-3.5 shrink-0" />}
       <span>
         {pct === 0 ? 'No change' : `${Math.abs(pct)}% ${pct > 0 ? 'up' : 'down'}`} vs last month
@@ -269,7 +321,7 @@ function Change({ current, previous, against }: { current: number; previous: num
 
 function Card({ id, title, subtitle, action, children }: { id: string; title: string; subtitle?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="flex flex-col rounded-lg border border-border bg-surface p-5 shadow-card sm:p-6">
+    <section aria-labelledby={id} className="flex min-w-0 flex-col rounded-lg border border-border bg-surface p-5 shadow-card sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id={id} className="text-base font-semibold text-ink">
@@ -305,10 +357,9 @@ function SpendingByCategory({ data }: { data: DashboardData }) {
       {segments.length === 0 ? (
         <p className="mt-6 text-sm text-ink-muted">No spending recorded for this period.</p>
       ) : (
-        <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row lg:flex-col xl:flex-row">
+        <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row lg:flex-col 2xl:flex-row">
           <DonutChart segments={segments} activeKey={active} onActiveChange={setActive}>
-            <span className="text-xs text-ink-muted">Spent</span>
-            <span className="text-base font-semibold text-ink tabular-nums">{formatMoney(total)}</span>
+            <DonutCentre segments={segments} active={active} label="Spent" value={total} />
           </DonutChart>
           <Legend
             segments={segments}
@@ -347,10 +398,9 @@ function WhereMoneyWent({ data }: { data: DashboardData }) {
         <p className="mt-6 text-sm text-ink-muted">No money in or out for this period.</p>
       ) : (
         <>
-          <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row lg:flex-col xl:flex-row">
+          <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row lg:flex-col 2xl:flex-row">
             <DonutChart segments={segments} activeKey={active} onActiveChange={setActive} size={148} thickness={18}>
-              <span className="text-xs text-ink-muted">Came in</span>
-              <span className="text-sm font-semibold text-ink tabular-nums">{formatMoney(cameIn)}</span>
+              <DonutCentre segments={segments} active={active} label="Came in" value={cameIn} small />
             </DonutChart>
             <Legend segments={segments} total={total} active={active} onActive={setActive} />
           </div>
@@ -367,6 +417,31 @@ function WhereMoneyWent({ data }: { data: DashboardData }) {
         </>
       )}
     </Card>
+  )
+}
+
+// The donut's centre: the total, or the selected segment's name and amount.
+function DonutCentre({
+  segments,
+  active,
+  label,
+  value,
+  small = false,
+}: {
+  segments: DonutSegment[]
+  active: string | null
+  label: string
+  value: number
+  small?: boolean
+}) {
+  const selected = segments.find((s) => s.key === active)
+  return (
+    <>
+      <span className="max-w-24 truncate text-xs text-ink-muted">{selected ? selected.label : label}</span>
+      <span className={`${small ? 'text-sm' : 'text-base'} font-semibold text-ink tabular-nums`}>
+        {formatMoney(selected ? selected.value : value)}
+      </span>
+    </>
   )
 }
 
@@ -387,20 +462,21 @@ function Legend({ segments, total, active, onActive, notes }: LegendProps) {
         return (
           <li
             key={s.key}
-            onPointerEnter={() => onActive(s.key)}
-            onPointerLeave={() => onActive(null)}
+            onPointerEnter={(e) => e.pointerType === 'mouse' && onActive(s.key)}
+            onPointerLeave={(e) => e.pointerType === 'mouse' && onActive(null)}
+            onClick={() => onActive(active === s.key ? null : s.key)}
             title={notes?.[s.key]}
-            className={`flex items-center gap-3 rounded-sm px-2 py-1.5 text-sm transition-colors duration-150 ${
+            className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-sm px-2 py-1.5 text-sm transition-colors duration-150 ${
               active === s.key ? 'bg-surface-muted' : ''
             }`}
           >
             <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-            <span className="min-w-0 flex-1 truncate text-ink">
+            <span className="min-w-0 flex-1 break-words text-ink">
               {s.label}
               {notes?.[s.key] && <span className="sr-only"> ({notes[s.key]})</span>}
             </span>
             <span className="shrink-0 text-ink tabular-nums">{formatMoney(s.value)}</span>
-            <span className="w-9 shrink-0 text-right text-xs text-ink-muted tabular-nums">{pct}%</span>
+            <span className="w-10 shrink-0 text-right text-[13px] text-ink-muted tabular-nums">{pct}%</span>
           </li>
         )
       })}
