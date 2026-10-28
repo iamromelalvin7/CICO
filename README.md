@@ -50,4 +50,7 @@ npx vercel dev          # app + /api functions on http://localhost:3000
 
 ## Project docs
 
-Product spec, build rules and design system are kept locally and not committed.
+- [`.agents/CLAUDE.md`](.agents/CLAUDE.md): product spec and decisions log
+- [`.agents/CICO-design-skill.md`](.agents/CICO-design-skill.md): design system
+- [`.agents/CICO-Rules.md`](.agents/CICO-Rules.md): build rules
+- [`CICO Mobile Audit.md`](CICO%20Mobile%20Audit.md): mobile UI audit (fixed Oct 28, 2026)
