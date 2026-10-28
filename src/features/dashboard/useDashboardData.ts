@@ -8,7 +8,6 @@ import {
   getTotalsForPeriod,
   INVESTMENTS_CATEGORY_ID,
   listRecentTransactions,
-  netMovedInto,
   SAVINGS_CATEGORY_ID,
   type CategoryTotal,
 } from '../../db'
@@ -30,13 +29,12 @@ export function useDashboardData(month: Date) {
       addMonths(month, i - (CASH_FLOW_MONTHS - 1)),
     )
 
-    const [balance, period, previous, byCategory, previousByCategory, recent, categories, daily, previousBalance, cashFlow] =
+    const [balance, period, previous, byCategory, recent, categories, daily, previousBalance, cashFlow] =
       await Promise.all([
         getBalance(),
         getTotalsForPeriod(range.start, range.end),
         getTotalsForPeriod(previousRange.start, previousRange.end),
         getTotalsByCategory(range.start, range.end),
-        getTotalsByCategory(previousRange.start, previousRange.end),
         listRecentTransactions(6),
         // Includes deleted categories so older rows still show their name.
         db.categories.toArray(),
@@ -51,10 +49,6 @@ export function useDashboardData(month: Date) {
       ])
 
     const spending = byCategory.filter((c) => c.direction === 'expense' && !isSavingsOrInvestment(c))
-    const movedTo = (id: string) =>
-      byCategory
-        .filter((c) => c.direction === 'expense' && c.category_id === id)
-        .reduce((sum, c) => sum + Math.round(c.total * 100), 0) / 100
 
     return {
       range,
@@ -68,13 +62,6 @@ export function useDashboardData(month: Date) {
       daily,
       period,
       previous,
-      savings: netMovedInto(byCategory, SAVINGS_CATEGORY_ID),
-      investments: netMovedInto(byCategory, INVESTMENTS_CATEGORY_ID),
-      previousSavings: netMovedInto(previousByCategory, SAVINGS_CATEGORY_ID),
-      previousInvestments: netMovedInto(previousByCategory, INVESTMENTS_CATEGORY_ID),
-      // Gross amounts moved this period, which are part of expenses.
-      movedToSavings: movedTo(SAVINGS_CATEGORY_ID),
-      movedToInvestments: movedTo(INVESTMENTS_CATEGORY_ID),
       spending,
       cashFlow,
       recent,

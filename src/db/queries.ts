@@ -2,8 +2,11 @@
 // the chat functions both call these, so numbers always agree. Results use snake_case
 // because they are also sent to the model as function results.
 //
-// Balance rule (decided): balance = income − expenses. Moving money into Savings or
-// Investments is an expense in that category, so it lowers the balance.
+// Transfers (decided): money moved into Savings or Investments is recorded as an expense in
+// that category, and money taken back out as income in it. These are transfers between the
+// user's own pots, not earning or spending, so income and expense totals leave them out.
+// Balance is the spendable money: every income minus every expense, transfers included
+// (= income − expenses − net moved into savings and investments).
 
 import { db } from './db'
 import type { Category, Direction, Transaction } from './types'
@@ -15,10 +18,17 @@ export const INVESTMENTS_CATEGORY_ID = '89eb5e09-b849-4016-8892-83ec577c698b'
 export interface PeriodTotals {
   start_date: string
   end_date: string
+  // Earned and spent; both exclude transfers to and from savings and investments.
   income: number
   expense: number
   // income − expense for the period.
   net: number
+  // Put in minus taken out over the period; negative when more came out.
+  net_moved_to_savings: number
+  net_moved_to_investments: number
+  // How much the balance changed: net − both net amounts moved.
+  balance_change: number
+  // Every transaction in the period, transfers included.
   transaction_count: number
 }
 
@@ -32,16 +42,33 @@ export interface CategoryTotal {
 }
 
 export interface Balance {
+  // All-time earned and spent, excluding transfers.
   income: number
   expense: number
+  // Spendable money: income − expense − in_savings − in_investments.
   balance: number
+  // All-time net moved in (put in minus taken out). Starts from zero when tracking began,
+  // so it can be negative if money saved earlier was taken out.
+  in_savings: number
+  in_investments: number
   transaction_count: number
 }
 
 // Dates are local calendar days, "YYYY-MM-DD", inclusive at both ends.
 export async function getTotalsForPeriod(start_date: string, end_date: string): Promise<PeriodTotals> {
   const rows = await transactionsBetween(start_date, end_date)
-  return { start_date, end_date, ...sumByDirection(rows) }
+  const t = summarize(rows)
+  return {
+    start_date,
+    end_date,
+    income: t.income,
+    expense: t.expense,
+    net: t.net,
+    net_moved_to_savings: t.savings,
+    net_moved_to_investments: t.investments,
+    balance_change: t.balance,
+    transaction_count: t.count,
+  }
 }
 
 // Sorted largest first.
@@ -127,19 +154,15 @@ export async function listLargestTransactions(
 // All-time balance across every active transaction.
 export async function getBalance(): Promise<Balance> {
   const rows = (await db.transactions.toArray()).filter((t) => t.deleted_at === null)
-  const { income, expense, net, transaction_count } = sumByDirection(rows)
-  return { income, expense, balance: net, transaction_count }
-}
-
-// Net amount moved into a category over the period: money put in (expense) minus money
-// taken back out (income). Used for the Savings and Investments cards.
-export function netMovedInto(totals: CategoryTotal[], categoryId: string): number {
-  let cents = 0
-  for (const t of totals) {
-    if (t.category_id !== categoryId) continue
-    cents += t.direction === 'expense' ? toCents(t.total) : -toCents(t.total)
+  const t = summarize(rows)
+  return {
+    income: t.income,
+    expense: t.expense,
+    balance: t.balance,
+    in_savings: t.savings,
+    in_investments: t.investments,
+    transaction_count: t.count,
   }
-  return fromCents(cents)
 }
 
 // All-time balance at the end of a local day (inclusive).
@@ -149,7 +172,7 @@ export async function getBalanceThrough(end_date: string): Promise<number> {
   const rows = (await db.transactions.where('occurred_at').below(to.toISOString()).toArray()).filter(
     (t) => t.deleted_at === null,
   )
-  return sumByDirection(rows).net
+  return summarize(rows).balance
 }
 
 export interface DailyBalance {
@@ -163,7 +186,7 @@ export async function getDailyBalances(start_date: string, end_date: string): Pr
   const before = (await db.transactions.where('occurred_at').below(from.toISOString()).toArray()).filter(
     (t) => t.deleted_at === null,
   )
-  let cents = toCents(sumByDirection(before).net)
+  let cents = toCents(summarize(before).balance)
 
   const byDay = new Map<string, number>()
   for (const t of await transactionsBetween(start_date, end_date)) {
@@ -224,18 +247,28 @@ async function categoryMap(): Promise<Map<string, Category>> {
 }
 
 // Sum in integer cents so totals don't pick up floating-point drift.
-function sumByDirection(rows: Transaction[]) {
+function summarize(rows: Transaction[]) {
   let income = 0
   let expense = 0
+  let savings = 0
+  let investments = 0
   for (const t of rows) {
-    if (t.direction === 'income') income += toCents(t.amount)
-    else expense += toCents(t.amount)
+    const cents = toCents(t.amount)
+    // Into a pot is an expense there; out of it is income.
+    const moved = t.direction === 'expense' ? cents : -cents
+    if (t.category_id === SAVINGS_CATEGORY_ID) savings += moved
+    else if (t.category_id === INVESTMENTS_CATEGORY_ID) investments += moved
+    else if (t.direction === 'income') income += cents
+    else expense += cents
   }
   return {
     income: fromCents(income),
     expense: fromCents(expense),
     net: fromCents(income - expense),
-    transaction_count: rows.length,
+    savings: fromCents(savings),
+    investments: fromCents(investments),
+    balance: fromCents(income - expense - savings - investments),
+    count: rows.length,
   }
 }
 

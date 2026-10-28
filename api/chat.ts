@@ -38,7 +38,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'get_totals_for_period',
     description:
-      'Total income, total expenses and transaction count for a date range (inclusive).',
+      'Income and expenses (both excluding savings and investment transfers), net amounts moved into savings and investments, balance change and transaction count for a date range (inclusive).',
     parametersJsonSchema: {
       type: 'object',
       properties: { start_date: DATE, end_date: DATE },
@@ -88,7 +88,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'get_balance',
     description:
-      'All-time balance (total income minus total expenses) with all-time totals and transaction count.',
+      'All-time spendable balance, all-time income and expenses (excluding transfers), net amounts held in savings and investments, and transaction count.',
     parametersJsonSchema: { type: 'object', properties: {} },
   },
 ]
@@ -103,7 +103,8 @@ Rules:
 - Call a function whenever the question needs data. Resolve relative periods ("this month", "last week") into explicit dates first.
 - If the results contain no matching transactions, say so plainly.
 - Amounts are in Ghana cedis; write them as "GH₵ 1,250.00".
-- Balance = income minus expenses. Money moved into savings or investments is recorded as an expense in the Savings or Investments category, so it lowers the balance. When the user asks about spending, say whether the figure includes money moved to savings or investments.
+- Money moved into savings or investments is recorded as an expense in the Savings or Investments category, and money taken out as income in that category. These are transfers, not earning or spending: the income and expense totals leave them out, and the net_moved_* and in_* fields report them. Per-category results include Savings and Investments rows; treat those as transfers too.
+- Balance is spendable money: income minus expenses, less what was moved into savings and investments. in_savings and in_investments count from when the user started tracking, so they can be negative if earlier savings were taken out; say so if that happens.
 - If a function result contains an "error", fix the arguments and call it again, or explain that you could not get the data.
 - Be concise. State the period you used, e.g. "October 1–20".
 - You describe the user's data; you do not give financial advice. Do not judge or shame spending.

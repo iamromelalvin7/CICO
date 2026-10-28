@@ -88,7 +88,7 @@ export function DashboardPage() {
 }
 
 function DashboardContent({ data, isCurrent, monthLabel }: { data: DashboardData; isCurrent: boolean; monthLabel: string }) {
-  const { period, previous, range, previousRange } = data
+  const { period, previous, range, previousRange, balance } = data
   return (
     <>
       <BalanceCard data={data} isCurrent={isCurrent} monthLabel={monthLabel} />
@@ -113,17 +113,17 @@ function DashboardContent({ data, isCurrent, monthLabel }: { data: DashboardData
             label="Savings"
             icon={PiggyBank}
             tint="var(--cico-amber)"
-            value={data.savings}
-            change={<Change current={data.savings} previous={data.previousSavings} against={previousRange.end} />}
-            note="Net moved into savings"
+            value={period.net_moved_to_savings}
+            change={<Change current={period.net_moved_to_savings} previous={previous.net_moved_to_savings} against={previousRange.end} />}
+            note={`Net moved in · ${formatMoney(balance.in_savings)} in total`}
           />
           <MetricCard
             label="Investments"
             icon={ChartLine}
             tint="var(--cico-violet)"
-            value={data.investments}
-            change={<Change current={data.investments} previous={data.previousInvestments} against={previousRange.end} />}
-            note="Net moved into investments"
+            value={period.net_moved_to_investments}
+            change={<Change current={period.net_moved_to_investments} previous={previous.net_moved_to_investments} against={previousRange.end} />}
+            note={`Net moved in · ${formatMoney(balance.in_investments)} in total`}
           />
         </ul>
       </section>
@@ -194,14 +194,14 @@ function BalanceCard({ data, isCurrent, monthLabel }: { data: DashboardData; isC
             </span>
           )}
           <span className="text-ink-muted">
-            Net for {formatRange(range)}:{' '}
+            Change for {formatRange(range)}:{' '}
             <span className="font-medium text-ink tabular-nums">
-              {period.net > 0 ? '+' : ''}
-              {formatMoney(period.net)}
+              {period.balance_change > 0 ? '+' : ''}
+              {formatMoney(period.balance_change)}
             </span>
           </span>
         </div>
-        <p className="mt-2 text-xs text-ink-muted">All-time income minus expenses.</p>
+        <p className="mt-2 text-xs text-ink-muted">Money you can spend: all-time income minus expenses, less what's in savings and investments.</p>
       </div>
       {points.length >= 2 && first && last && (
         <TrendArea
@@ -325,16 +325,21 @@ function SpendingByCategory({ data }: { data: DashboardData }) {
 
 function WhereMoneyWent({ data }: { data: DashboardData }) {
   const [active, setActive] = useState<string | null>(null)
-  const spent = data.spending.reduce((sum, c) => sum + Math.round(c.total * 100), 0) / 100
-  const leftOver = Math.round((data.period.income - data.period.expense) * 100) / 100
+  const { period } = data
+  const leftOver = period.balance_change
+  // Taken out of savings or investments on balance this period; it counts as money in here.
+  const fromPots =
+    (Math.round(Math.max(-period.net_moved_to_savings, 0) * 100) +
+      Math.round(Math.max(-period.net_moved_to_investments, 0) * 100)) /
+    100
   const segments: DonutSegment[] = [
-    { key: 'spent', label: 'Spent', value: spent, color: 'var(--cico-expense)' },
-    { key: 'savings', label: 'To savings', value: data.movedToSavings, color: 'var(--cico-amber)' },
-    { key: 'investments', label: 'To investments', value: data.movedToInvestments, color: 'var(--cico-violet)' },
+    { key: 'spent', label: 'Spent', value: period.expense, color: 'var(--cico-expense)' },
+    { key: 'savings', label: 'To savings', value: Math.max(period.net_moved_to_savings, 0), color: 'var(--cico-amber)' },
+    { key: 'investments', label: 'To investments', value: Math.max(period.net_moved_to_investments, 0), color: 'var(--cico-violet)' },
     { key: 'left', label: 'Left over', value: Math.max(leftOver, 0), color: 'var(--cico-accent)' },
   ].filter((s) => s.value > 0)
   const total = segments.reduce((sum, s) => sum + Math.round(s.value * 100), 0) / 100
-  const income = data.period.income
+  const cameIn = (Math.round(period.income * 100) + Math.round(fromPots * 100)) / 100
 
   return (
     <Card id="went-heading" title="Where your money went" subtitle={`${formatRange(data.range)} · share of money in and out`}>
@@ -345,10 +350,15 @@ function WhereMoneyWent({ data }: { data: DashboardData }) {
           <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row lg:flex-col xl:flex-row">
             <DonutChart segments={segments} activeKey={active} onActiveChange={setActive} size={148} thickness={18}>
               <span className="text-xs text-ink-muted">Came in</span>
-              <span className="text-sm font-semibold text-ink tabular-nums">{formatMoney(income)}</span>
+              <span className="text-sm font-semibold text-ink tabular-nums">{formatMoney(cameIn)}</span>
             </DonutChart>
             <Legend segments={segments} total={total} active={active} onActive={setActive} />
           </div>
+          {fromPots > 0 && (
+            <p className="mt-4 rounded-sm bg-surface-muted px-3 py-2 text-xs text-ink">
+              Includes {formatMoney(fromPots)} taken out of savings and investments.
+            </p>
+          )}
           {leftOver < 0 && (
             <p className="mt-4 rounded-sm bg-surface-muted px-3 py-2 text-xs text-ink">
               {formatMoney(-leftOver)} more went out than came in this period.
@@ -413,7 +423,7 @@ function CashFlow({ data }: { data: DashboardData }) {
     <Card
       id="cashflow-heading"
       title="Cash flow"
-      subtitle="Money in and out over the last six months"
+      subtitle="Earned and spent over the last six months · excludes savings and investments"
       action={
         <div className="flex shrink-0 items-center gap-3 text-xs text-ink-muted">
           <span className="flex items-center gap-1.5">
