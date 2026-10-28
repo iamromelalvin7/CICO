@@ -2,7 +2,7 @@ import { Check, CircleAlert, Delete, LoaderCircle, WifiOff } from 'lucide-react'
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { onLock } from './lock-events'
-import { clearPin, hasPin, PIN_PATTERN, sessionValid, setPin, startSession, verifyPin } from './pin'
+import { clearPin, hasPin, PIN_PATTERN, sessionValid, setPin, startSession, syncPin, verifyPin } from './pin'
 import {
   CODE_PATTERN,
   maskedRecoveryEmail,
@@ -18,6 +18,8 @@ const MAX_TRIES = 5
 const WAIT_SECONDS = 30
 const RESEND_SECONDS = 60
 const SESSION_CHECK_MS = 60_000
+// How long the lock screen waits for the server's PIN before going on without it.
+const PIN_SYNC_WAIT_MS = 5_000
 
 // Shows the app only after the PIN is entered (or first set). A session lasts three days.
 export function LockGate({ children }: { children: ReactNode }) {
@@ -66,6 +68,7 @@ export function LockGate({ children }: { children: ReactNode }) {
           ) : screen === 'setup' ? (
             <SetupPin
               notice={notice}
+              mode={notice ? 'replace' : 'create'}
               onDone={() => {
                 setNotice(null)
                 setScreen('unlocked')
@@ -77,7 +80,7 @@ export function LockGate({ children }: { children: ReactNode }) {
             <ForgotPin
               onBack={() => setScreen('locked')}
               onReset={() => {
-                setNotice('Code confirmed. Choose a new PIN for this device.')
+                setNotice('Code confirmed. Choose a new PIN for all your devices.')
                 setScreen('setup')
               }}
             />
@@ -89,11 +92,28 @@ export function LockGate({ children }: { children: ReactNode }) {
 }
 
 async function initialScreen(): Promise<Screen> {
+  // A PIN set on another device (or in the browser, for the installed app) is used here too.
+  if (!(await hasPin())) await refreshPin()
   if (!(await hasPin())) return 'setup'
   return (await sessionValid()) ? 'unlocked' : 'locked'
 }
 
-function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => void }) {
+// Picks up a PIN set or changed on another device. Doesn't hold the screen up for long when
+// offline or slow; the sync carries on in the background.
+async function refreshPin(): Promise<void> {
+  const sync = syncPin().catch((err) => console.error('PIN sync failed', err))
+  await Promise.race([sync, new Promise((resolve) => window.setTimeout(resolve, PIN_SYNC_WAIT_MS))])
+}
+
+function SetupPin({
+  notice,
+  mode,
+  onDone,
+}: {
+  notice: string | null
+  mode: 'create' | 'replace'
+  onDone: () => void
+}) {
   const [first, setFirst] = useState<string | null>(null)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +139,7 @@ function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => voi
     }
     setBusy(true)
     try {
-      await setPin(value)
+      await setPin(value, mode)
       await startSession()
       onDone()
     } catch (err) {
@@ -138,7 +158,7 @@ function SetupPin({ notice, onDone }: { notice: string | null; onDone: () => voi
             ? notice
             : confirming
               ? 'Type it once more to confirm.'
-              : "4 to 6 digits. It keeps casual eyes off this device; it isn't a password. You'll be asked for it every three days."
+              : "4 to 6 digits. It keeps casual eyes off CICO; it isn't a password. The same PIN works on all your devices, and you'll be asked for it every three days."
         }
         value={value}
         onChange={(v) => {
@@ -181,6 +201,7 @@ function Unlock({ onUnlocked, onForgot }: { onUnlocked: () => void; onForgot: ()
     }
     setBusy(true)
     try {
+      await refreshPin()
       if (await verifyPin(value)) {
         await startSession()
         onUnlocked()

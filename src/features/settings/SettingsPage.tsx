@@ -184,9 +184,9 @@ function ChangePinForm({ onDone }: { onDone: () => void }) {
         setBusy(false)
         return
       }
-      await setPin(values.next)
+      await setPin(values.next, 'replace')
       await startSession()
-      toast('PIN changed', 'Use the new PIN next time CICO asks')
+      toast('PIN changed', 'Use the new PIN on all your devices')
       onDone()
     } catch (err) {
       console.error(err)

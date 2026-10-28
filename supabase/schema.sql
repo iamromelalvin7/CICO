@@ -32,6 +32,15 @@ create table if not exists public.transactions (
   server_updated_at timestamptz not null default clock_timestamp()
 );
 
+-- Settings shared by every device, one row per key. Holds the PIN hash ("pin") so the same
+-- PIN unlocks every device and the installed app.
+create table if not exists public.settings (
+  key               text primary key,
+  value             jsonb not null,
+  updated_at        timestamptz not null,
+  server_updated_at timestamptz not null default clock_timestamp()
+);
+
 create index if not exists categories_server_updated_at_idx
   on public.categories (server_updated_at, id);
 create index if not exists transactions_server_updated_at_idx
@@ -62,12 +71,19 @@ create trigger transactions_last_write_wins
   before insert or update on public.transactions
   for each row execute function public.cico_last_write_wins();
 
+drop trigger if exists settings_last_write_wins on public.settings;
+create trigger settings_last_write_wins
+  before insert or update on public.settings
+  for each row execute function public.cico_last_write_wins();
+
 alter table public.categories disable row level security;
 alter table public.transactions disable row level security;
+alter table public.settings disable row level security;
 
 -- The app only reads, inserts and updates. No delete grant: deletes are soft.
 grant select, insert, update on public.categories to anon;
 grant select, insert, update on public.transactions to anon;
+grant select, insert, update on public.settings to anon;
 
 -- Make the new tables visible to the REST API straight away.
 notify pgrst, 'reload schema';

@@ -4,9 +4,11 @@
 // resolve), then pull everything changed on the server since the last pull. Conflicts are
 // last-write-wins on updated_at, enforced by the server (supabase/schema.sql) and mirrored
 // here when merging pulled rows. A row is marked synced only after the server confirms it.
+// The PIN hash rides along on each run (see lock/pin.ts).
 
 import { liveQuery, type Table } from 'dexie'
 import { db, type Category, type Transaction } from '../db'
+import { syncPin } from '../lock/pin'
 import {
   fetchChangedRows,
   fetchRowsById,
@@ -169,6 +171,7 @@ async function runOnce(): Promise<boolean> {
     await push('transactions')
     await pull('categories')
     await pull('transactions')
+    await syncPin()
     lastSyncedAt = new Date().toISOString()
     await db.meta.put({ key: LAST_SYNCED_KEY, value: lastSyncedAt })
     failed = false

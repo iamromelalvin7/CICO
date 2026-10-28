@@ -95,3 +95,31 @@ export async function fetchChangedRows<T>(
   const res = await request(`${table}?${params}`)
   return (await res.json()) as RemoteRow<T>[]
 }
+
+// ---- Shared settings (one row per key, e.g. the PIN hash) ----
+
+export interface RemoteSetting<T> {
+  value: T
+  updated_at: string
+}
+
+export async function fetchSetting<T>(key: string): Promise<RemoteSetting<T> | null> {
+  const params = new URLSearchParams({ select: 'value,updated_at', key: `eq.${key}` })
+  const res = await request(`settings?${params}`)
+  const rows = (await res.json()) as RemoteSetting<T>[]
+  return rows[0] ?? null
+}
+
+// `replace` overwrites a stored value with an older updated_at (last write wins, enforced by
+// the server); otherwise the write is skipped if the key already exists.
+export async function putSetting(
+  key: string,
+  setting: RemoteSetting<unknown>,
+  { replace }: { replace: boolean },
+): Promise<void> {
+  await request('settings?on_conflict=key', {
+    method: 'POST',
+    headers: { Prefer: `resolution=${replace ? 'merge-duplicates' : 'ignore-duplicates'},return=minimal` },
+    body: JSON.stringify([{ key, ...setting }]),
+  })
+}
