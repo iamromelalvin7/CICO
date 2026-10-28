@@ -3,7 +3,6 @@
 // browser runs them against its local data and sends the results back in a
 // follow-up request. The model then phrases an answer from those results only.
 
-import { FunctionCallingConfigMode, type Content, type FunctionDeclaration } from '@google/genai'
 import {
   CHAT_FUNCTIONS,
   LIMITS,
@@ -13,7 +12,7 @@ import {
   type ChatTurn,
   type ClientClock,
 } from '../shared/ai-contract.js'
-import { chatModel, generate } from './_lib/gemini.js'
+import { chatStep, type ToolDeclaration } from './_lib/ai.js'
 import {
   HttpError,
   RateLimiter,
@@ -34,12 +33,12 @@ const DIRECTION = {
   description: 'Only include transactions in this direction. Omit for both.',
 }
 
-const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
+const FUNCTION_DECLARATIONS: ToolDeclaration[] = [
   {
     name: 'get_totals_for_period',
     description:
       'Income and expenses (both excluding savings and investment transfers), net amounts moved into savings and investments, balance change and transaction count for a date range (inclusive).',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: { start_date: DATE, end_date: DATE },
       required: ['start_date', 'end_date'],
@@ -49,7 +48,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     name: 'get_totals_by_category',
     description:
       'Totals per category for a date range (inclusive), with transaction counts per category.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: { start_date: DATE, end_date: DATE, direction: DIRECTION },
       required: ['start_date', 'end_date'],
@@ -59,7 +58,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     name: 'compare_periods',
     description:
       'Income, expense and per-category totals for two date ranges side by side, e.g. this month vs last month.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         period_a_start: DATE,
@@ -73,7 +72,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'list_largest_transactions',
     description: 'The largest transactions in a date range (inclusive), biggest first.',
-    parametersJsonSchema: {
+    parameters: {
       type: 'object',
       properties: {
         start_date: DATE,
@@ -89,7 +88,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     name: 'get_balance',
     description:
       'All-time spendable balance, all-time income and expenses (excluding transfers), net amounts held in savings and investments, and transaction count.',
-    parametersJsonSchema: { type: 'object', properties: {} },
+    parameters: { type: 'object', properties: {} },
   },
 ]
 
@@ -106,10 +105,12 @@ Rules:
 - Money moved into savings or investments is recorded as an expense in the Savings or Investments category, and money taken out as income in that category. These are transfers, not earning or spending: the income and expense totals leave them out, and the net_moved_* and in_* fields report them. Per-category results include Savings and Investments rows; treat those as transfers too.
 - Balance is spendable money: income minus expenses, less what was moved into savings and investments. in_savings and in_investments count from when the user started tracking, so they can be negative if earlier savings were taken out; say so if that happens.
 - If a function result contains an "error", fix the arguments and call it again, or explain that you could not get the data.
-- Be concise. State the period you used, e.g. "October 1–20".
+- Be concise: one to three short sentences, unless the user asks for a breakdown. State the period you used, e.g. "October 1–20".
+- Quote figures as the results give them. Never split or derive a figure the results don't contain: net_moved_* values are already net, so say "net GH₵ 300.00 moved into savings", not separate amounts in and out.
+- list_largest_transactions includes Savings and Investments transfers. For questions about spending or expenses, ask for 10 and leave those rows out.
 - You describe the user's data; you do not give financial advice. Do not judge or shame spending.
 - If a question is not about the user's transactions, say you can only answer questions about their recorded money.
-- Plain text only, no emoji.`
+- Plain text only: no Markdown (no asterisks, bold, headings or tables) and no emoji. For a breakdown, put each item on its own line starting with "- ".`
 }
 
 export const POST = postHandler(limiter, async (body): Promise<ChatResponse> => {
@@ -121,61 +122,32 @@ export const POST = postHandler(limiter, async (body): Promise<ChatResponse> => 
   // Stop runaway loops: after too many function rounds, force a text answer.
   const allowTools = toolRoundsSinceLastQuestion(turns) < LIMITS.chatToolRounds
 
-  const response = await generate({
-    model: chatModel(),
-    contents: turns.map(toContent),
-    config: {
-      systemInstruction: systemInstruction(clock, categories),
-      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-      toolConfig: {
-        functionCallingConfig: {
-          mode: allowTools ? FunctionCallingConfigMode.AUTO : FunctionCallingConfigMode.NONE,
-        },
-      },
-    },
+  const step = await chatStep({
+    system: systemInstruction(clock, categories),
+    turns,
+    tools: FUNCTION_DECLARATIONS,
+    allowTools,
   })
 
-  const parts = response.candidates?.[0]?.content?.parts ?? []
-  const calls: ChatFunctionCall[] = []
-  for (const part of parts) {
-    if (!part.functionCall) continue
-    const name = part.functionCall.name
+  if ('text' in step) return { type: 'answer', text: plainText(step.text) }
+  const calls = step.calls.map((call): ChatFunctionCall => {
+    const { name } = call
     if (!isChatFunction(name)) {
       throw new HttpError(502, 'The assistant made an invalid request. Try rephrasing.')
     }
-    calls.push({
-      name,
-      args: part.functionCall.args ?? {},
-      ...(part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {}),
-    })
-  }
-  if (calls.length > 0) return { type: 'function_calls', calls }
-
-  const text = response.text?.trim()
-  if (!text) throw new HttpError(502, "The assistant didn't return an answer. Try again.")
-  return { type: 'answer', text }
+    return { ...call, name }
+  })
+  return { type: 'function_calls', calls }
 })
 
-function toContent(turn: ChatTurn): Content {
-  if (turn.role === 'user') return { role: 'user', parts: [{ text: turn.text }] }
-  if (turn.role === 'function') {
-    return {
-      role: 'user',
-      parts: turn.results.map((r) => ({
-        functionResponse: { name: r.name, response: { result: r.result } },
-      })),
-    }
-  }
-  if ('functionCalls' in turn) {
-    return {
-      role: 'model',
-      parts: turn.functionCalls.map((c) => ({
-        functionCall: { name: c.name, args: c.args },
-        ...(c.thoughtSignature ? { thoughtSignature: c.thoughtSignature } : {}),
-      })),
-    }
-  }
-  return { role: 'model', parts: [{ text: turn.text }] }
+// The chat shows answers as plain text; some models add Markdown anyway.
+function plainText(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*\*\s+/gm, '- ')
+    .trim()
 }
 
 function toolRoundsSinceLastQuestion(turns: ChatTurn[]): number {

@@ -2,7 +2,7 @@
 
 A personal finance tracker that answers "where did all my money go?". Log income, expenses, savings and investments in plain language, keep working offline, and sync across devices when online.
 
-Offline-first PWA built with React, Vite, Tailwind CSS, IndexedDB, Supabase and Gemini.
+Offline-first PWA built with React, Vite, Tailwind CSS, IndexedDB, Supabase, Groq and Gemini.
 
 ## Getting started
 
@@ -20,7 +20,7 @@ For deployments, set the same `VITE_` variables (plus `VITE_RECOVERY_EMAIL`) in 
 
 ### Running the AI functions locally
 
-Gemini is called only from the serverless functions in `api/` (`/api/parse` and `/api/chat`), so the API key never reaches the browser. `npm run dev` serves the app but not these functions. To run both together, use the Vercel CLI:
+The AI models are called only from the serverless functions in `api/` (`/api/parse` and `/api/chat`), so the API keys never reach the browser. Groq (open models) is tried first when `GROQ_API_KEY` is set; Gemini takes over if Groq fails or hits its limit. Set either key or both. `npm run dev` serves the app but not these functions. To run both together, use the Vercel CLI:
 
 ```bash
 npx vercel login        # first time only
@@ -28,7 +28,7 @@ npx vercel link         # first time only: link this folder to the Vercel projec
 npx vercel dev          # app + /api functions on http://localhost:3000
 ```
 
-`vercel dev` reads `GEMINI_API_KEY` from your local `.env`. For deployments, set it in the Vercel dashboard under Project Settings → Environment Variables.
+`vercel dev` reads `GROQ_API_KEY` and `GEMINI_API_KEY` from your local `.env`. For deployments, set them in the Vercel dashboard under Project Settings → Environment Variables.
 
 ## Scripts
 
